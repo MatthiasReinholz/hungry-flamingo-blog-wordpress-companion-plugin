@@ -1,0 +1,49 @@
+=== Hungry Flamingo Blog Companion ===
+Contributors: matthiasreinholz
+Requires at least: 6.4
+Tested up to: 6.9
+Requires PHP: 8.2
+Stable tag: 1.0.0
+License: GPLv3
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
+Tags: blog, blocks, full-site-editing, reading, editorial
+
+Companion functionality for the Hungry Flamingo Blog theme.
+
+== Description ==
+
+Hungry Flamingo Blog Companion contains functionality that should live outside the theme: the continuous-reading post stack, the public next-posts REST endpoint, and the optional `hfb/post-stack` dynamic block.
+
+The plugin is designed for the Hungry Flamingo Blog theme but keeps the feature portable so the theme itself can stay focused on design, templates, and presentation. Developer and AI coding-agent guidance is included in `AGENTS.md` in the source repository.
+
+The plugin intentionally does not alter WooCommerce products, carts, checkout, orders, or account pages. Auto-append runs only on singular `post` content.
+
+== Installation ==
+
+1. Upload the plugin directory to `wp-content/plugins/`.
+2. Activate Hungry Flamingo Blog Companion in Plugins.
+3. Visit a single post. The plugin appends a continuous-reading stack after the post content.
+
+== Frequently Asked Questions ==
+
+= Does this plugin require the Hungry Flamingo Blog theme? =
+
+No. It is designed for that theme and inherits its visual language when both are active, but the REST endpoint and post-stack block are plugin-owned.
+
+= What REST endpoint does it add? =
+
+The plugin adds `/wp-json/hfb/v1/next-posts`. The endpoint is public, accepts `after`, `count`, and optional `seen[]` query parameters. `exclude[]` is accepted as a backwards-compatible alias for `seen[]`. The endpoint only returns already-public, published, non-password-protected `post` objects.
+
+= Does this plugin change WooCommerce pages? =
+
+No. WooCommerce compatibility belongs to the theme and WooCommerce itself. This plugin only works with public blog posts.
+
+= Does it collect personal data? =
+
+No. The plugin does not set cookies, track users, or make server-side calls to external services. The public REST endpoint returns rendered markup for public posts only, and its short-lived object-cache entry stores selected post IDs rather than rendered HTML. Rendered author avatars use WordPress' configured avatar system; on default WordPress installs, visitors' browsers may request avatar images from Gravatar.
+
+== Changelog ==
+
+= 1.0.0 =
+
+Initial beta release.

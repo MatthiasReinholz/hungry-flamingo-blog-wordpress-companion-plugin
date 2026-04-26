@@ -1,0 +1,10 @@
+{
+  "suppressions": [
+    {
+      "kind": "rest_permission_callback_true",
+      "identifier": "hfb/v1/next-posts",
+      "path": "includes/class-continuous-reading.php",
+      "justification": "Intentional public read-only endpoint. It accepts only bounded numeric input and returns rendered markup for already-public, published, non-password-protected posts."
+    }
+  ]
+}

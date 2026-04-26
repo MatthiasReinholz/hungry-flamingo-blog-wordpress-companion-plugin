@@ -1,0 +1,10 @@
+dist/
+node_modules/
+.wp-plugin-base-tools/
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+npm-debug.log*
+yarn-error.log*

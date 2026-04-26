@@ -1,0 +1,43 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Hungry Flamingo Blog Companion 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/MatthiasReinholz/hungry-flamingo-blog-wordpress-companion-plugin/issues\n"
+"POT-Creation-Date: 2026-04-25 00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: wp-plugin-base\n"
+"X-Domain: hungry-flamingo-blog-companion\n"
+
+msgid "Link copied"
+msgstr ""
+
+msgid "Post Stack"
+msgstr ""
+
+msgid "Appends the continuous-reading stack for the current post."
+msgstr ""
+
+msgid "Post Stack appears when viewing a public post."
+msgstr ""
+
+msgid "Loading next article"
+msgstr ""
+
+msgid "Unknown source post."
+msgstr ""
+
+msgid "Unknown Author"
+msgstr ""
+
+msgid "Long read · %s min"
+msgstr ""
+
+msgid "%d min read"
+msgstr ""
+
+msgid "Share"
+msgstr ""
+
+msgid "More from this author"
+msgstr ""

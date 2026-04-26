@@ -1,0 +1,121 @@
+/*! Hungry Flamingo Blog Companion — continuous reading */
+.hfb-post-stack {
+	position: relative;
+	margin-top: 48px;
+}
+
+.hfb-post-stack__slot {
+	min-height: 320px;
+}
+
+.hfb-post-stack__slot + .hfb-post-stack__slot,
+.hfb-post-stack__slot + .hfb-article {
+	border-top: 1px solid var(--border, #ebe4da);
+	margin-top: 72px;
+	padding-top: 72px;
+}
+
+.hfb-post-stack__slot--skeleton[aria-busy="true"] {
+	display: grid;
+	align-items: center;
+}
+
+.hfb-post-stack__slot-skeleton {
+	display: grid;
+	gap: 14px;
+	max-width: min(720px, 100%);
+}
+
+.hfb-post-stack__slot--skeleton .skeleton {
+	animation: hfb-companion-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hfb-post-stack__slot--skeleton .skeleton {
+		animation: none;
+	}
+}
+
+.hfb-post-stack .skeleton {
+	background: linear-gradient(90deg, var(--surface-2, #fff4e8), var(--border, #ebe4da), var(--surface-2, #fff4e8));
+	background-size: 200% 100%;
+	border-radius: 8px;
+}
+
+.hfb-post-stack .skeleton--tag {
+	width: 90px;
+	height: 22px;
+	border-radius: 999px;
+}
+
+.hfb-post-stack .skeleton--title {
+	width: 80%;
+	height: 48px;
+}
+
+.hfb-post-stack .skeleton--line {
+	width: 100%;
+	height: 16px;
+}
+
+.hfb-post-stack .skeleton--line.short {
+	width: 60%;
+}
+
+@keyframes hfb-companion-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+.hfb-post-stack__slot--loaded .hfb-post-stack__slot-skeleton {
+	display: none;
+}
+
+.hfb-post-stack .hfb-article {
+	padding-block: 0 40px;
+}
+
+.hfb-post-stack .hfb-article__title a {
+	color: inherit;
+}
+
+.hfb-post-stack .share-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-muted, #5a5d72);
+	cursor: pointer;
+	font: inherit;
+	font-size: 14px;
+}
+
+.hfb-post-stack .share-btn:hover {
+	background: var(--surface, #fff);
+	color: var(--text, #141521);
+}
+
+.hfb-post-stack .share-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.hfb-post-stack .share-btn__copied {
+	margin-left: 6px;
+	color: var(--hf-flamingo, #ff3e7a);
+	font-weight: 600;
+}
+
+@media print {
+	.hfb-post-stack {
+		display: none !important;
+	}
+}
