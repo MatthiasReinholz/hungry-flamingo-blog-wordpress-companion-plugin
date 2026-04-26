@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Hungry Flamingo Blog Companion
  * Plugin URI: https://github.com/MatthiasReinholz/hungry-flamingo-blog-wordpress-companion-plugin
- * Description: Adds the continuous-reading post stack and optional post-stack block for the Hungry Flamingo Blog theme.
+ * Description: Adds continuous reading, related-post blocks, reader CTAs, reading progress, and a local editorial report for Hungry Flamingo Blog.
  * Version: 1.0.0
  * Requires at least: 6.4
  * Requires PHP: 8.2

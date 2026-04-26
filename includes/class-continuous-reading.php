@@ -188,6 +188,27 @@ final class Continuous_Reading {
 			$collected = array_merge( $collected, $this->remove_excluded( $fill, $exclude, $need ) );
 		}
 
+		if ( count( $collected ) < $count ) {
+			$need    = $count - count( $collected );
+			$exclude = array_unique( array_merge( $excluded, $collected ) );
+			$wrap    = get_posts(
+				[
+					'posts_per_page'         => $this->query_limit( $need, $exclude ),
+					'post_status'            => 'publish',
+					'has_password'           => false,
+					'ignore_sticky_posts'    => true,
+					'fields'                 => 'ids',
+					'orderby'                => 'date',
+					'order'                  => 'DESC',
+					'no_found_rows'          => true,
+					'update_post_term_cache' => false,
+					'update_post_meta_cache' => false,
+				]
+			);
+
+			$collected = array_merge( $collected, $this->remove_excluded( $wrap, $exclude, $need ) );
+		}
+
 		return array_slice( array_values( array_unique( $collected ) ), 0, $count );
 	}
 

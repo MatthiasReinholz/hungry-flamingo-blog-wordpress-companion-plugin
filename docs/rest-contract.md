@@ -36,6 +36,8 @@ The normal no-exclusion path caches selected post IDs in the WordPress object ca
 
 The endpoint does not set cookies, collect visitor identifiers, call external services, or expose private post data. Rendered author avatars use the site's configured WordPress avatar behavior; default WordPress installs may load Gravatar images in the visitor's browser.
 
+The reading progress indicator and local editorial report do not store visitor data or call external services.
+
 ## WooCommerce Boundary
 
 This endpoint and the auto-append integration are post-only. WooCommerce products, carts, checkout, accounts, and orders are out of scope for the companion plugin.

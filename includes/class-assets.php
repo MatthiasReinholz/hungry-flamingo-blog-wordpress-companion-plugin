@@ -56,6 +56,7 @@ final class Assets {
 			[
 				'endpoint'  => esc_url_raw( rest_url( 'hfb/v1/next-posts' ) ),
 				'postId'    => $post_id,
+				'title'     => wp_strip_all_tags( get_the_title( $post_id ) ),
 				'stackSize' => (int) HFB_COMPANION_STACK_SIZE,
 				'strings'   => [
 					'linkCopied' => __( 'Link copied', 'hungry-flamingo-blog-companion' ),

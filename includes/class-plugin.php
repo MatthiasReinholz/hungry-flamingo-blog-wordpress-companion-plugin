@@ -20,9 +20,12 @@ final class Plugin {
 	 */
 	private $modules = [
 		Assets::class,
+		Admin_Report::class,
 		Content_Integration::class,
 		Continuous_Reading::class,
 		Blocks\Post_Stack::class,
+		Blocks\Related_Posts::class,
+		Blocks\Reader_Cta::class,
 	];
 
 	public function boot(): void {

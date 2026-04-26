@@ -41,3 +41,81 @@ msgstr ""
 
 msgid "More from this author"
 msgstr ""
+
+msgid "Related Posts"
+msgstr ""
+
+msgid "Shows local related articles for the current public post."
+msgstr ""
+
+msgid "Read next"
+msgstr ""
+
+msgid "Related Posts appears on singular public posts."
+msgstr ""
+
+msgid "No related posts found yet."
+msgstr ""
+
+msgid "Reader CTA"
+msgstr ""
+
+msgid "Adds a provider-neutral post-end call-to-action slot."
+msgstr ""
+
+msgid "Keep reading"
+msgstr ""
+
+msgid "Find the next useful article"
+msgstr ""
+
+msgid "Use this slot for a local editorial prompt, a series landing page, or an RSS follow link."
+msgstr ""
+
+msgid "Browse articles"
+msgstr ""
+
+msgid "Hungry Flamingo Report"
+msgstr ""
+
+msgid "Hungry Flamingo"
+msgstr ""
+
+msgid "You do not have permission to view this report."
+msgstr ""
+
+msgid "Hungry Flamingo Editorial Report"
+msgstr ""
+
+msgid "This local report reviews recent published posts for reader-retention basics. It does not send data anywhere."
+msgstr ""
+
+msgid "Post"
+msgstr ""
+
+msgid "Words"
+msgstr ""
+
+msgid "Internal links"
+msgstr ""
+
+msgid "Related candidates"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "No published posts found."
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Healthy"
+msgstr ""
+
+msgid "Add internal links"
+msgstr ""
+
+msgid "Needs related posts"
+msgstr ""

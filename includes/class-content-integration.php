@@ -65,7 +65,7 @@ final class Content_Integration {
 		}
 
 		$contains = false;
-		$slugs    = [ 'single', 'singular', 'index' ];
+		$slugs    = [ 'single-post', 'single', 'singular', 'index' ];
 
 		if ( function_exists( 'get_block_template' ) ) {
 			foreach ( $slugs as $slug ) {
