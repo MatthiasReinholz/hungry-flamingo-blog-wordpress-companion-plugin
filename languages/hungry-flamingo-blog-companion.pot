@@ -1,43 +1,274 @@
+# Copyright (C) 2026 Matthias Reinholz
+# This file is distributed under the GPLv3.
 msgid ""
 msgstr ""
 "Project-Id-Version: Hungry Flamingo Blog Companion 1.0.0\n"
-"Report-Msgid-Bugs-To: https://github.com/MatthiasReinholz/hungry-flamingo-blog-wordpress-companion-plugin/issues\n"
-"POT-Creation-Date: 2026-04-25 00:00+0000\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/hungry-flamingo-blog-companion\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: wp-plugin-base\n"
+"POT-Creation-Date: 2026-04-27T07:01:12+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: hungry-flamingo-blog-companion\n"
 
-msgid "Link copied"
+#. Plugin Name of the plugin
+#: hungry-flamingo-blog-companion.php
+msgid "Hungry Flamingo Blog Companion"
 msgstr ""
 
-msgid "Post Stack"
+#. Plugin URI of the plugin
+#: hungry-flamingo-blog-companion.php
+msgid "https://github.com/MatthiasReinholz/hungry-flamingo-blog-wordpress-companion-plugin"
 msgstr ""
 
-msgid "Appends the continuous-reading stack for the current post."
+#. Description of the plugin
+#: hungry-flamingo-blog-companion.php
+msgid "Adds continuous reading, related-post blocks, reader CTAs, reading progress, and a local editorial report for Hungry Flamingo Blog."
 msgstr ""
 
+#. Author of the plugin
+#: hungry-flamingo-blog-companion.php
+msgid "Matthias Reinholz"
+msgstr ""
+
+#. Author URI of the plugin
+#: hungry-flamingo-blog-companion.php
+msgid "https://matthiasreinholz.com/"
+msgstr ""
+
+#: includes/blocks/class-post-stack.php:39
 msgid "Post Stack appears when viewing a public post."
 msgstr ""
 
-msgid "Loading next article"
+#: includes/blocks/class-reader-cta.php:37
+#: assets/js/blocks.js:154
+msgid "Keep reading"
 msgstr ""
 
-msgid "Unknown source post."
+#: includes/blocks/class-reader-cta.php:38
+#: assets/js/blocks.js:158
+msgid "Find the next useful article"
 msgstr ""
 
+#: includes/blocks/class-reader-cta.php:39
+#: assets/js/blocks.js:162
+msgid "Use this slot for a local editorial prompt, a series landing page, or an RSS follow link."
+msgstr ""
+
+#: includes/blocks/class-reader-cta.php:40
+#: assets/js/blocks.js:166
+msgid "Browse articles"
+msgstr ""
+
+#: includes/blocks/class-related-posts.php:40
+#: includes/blocks/class-related-posts.php:47
+msgid "Related Posts appears on singular public posts."
+msgstr ""
+
+#: includes/blocks/class-related-posts.php:54
+#: includes/class-related-posts.php:77
+#: assets/js/blocks.js:90
+msgid "Read next"
+msgstr ""
+
+#: includes/blocks/class-related-posts.php:65
+msgid "No related posts found yet."
+msgstr ""
+
+#: includes/class-admin-report.php:24
+msgid "Hungry Flamingo Report"
+msgstr ""
+
+#: includes/class-admin-report.php:25
+msgid "Hungry Flamingo"
+msgstr ""
+
+#: includes/class-admin-report.php:34
+msgid "You do not have permission to view this report."
+msgstr ""
+
+#: includes/class-admin-report.php:53
+msgid "Hungry Flamingo Editorial Report"
+msgstr ""
+
+#: includes/class-admin-report.php:54
+msgid "This local report reviews recent published posts for reader-retention basics. It does not send data anywhere."
+msgstr ""
+
+#: includes/class-admin-report.php:59
+msgid "Post"
+msgstr ""
+
+#: includes/class-admin-report.php:60
+msgid "Words"
+msgstr ""
+
+#: includes/class-admin-report.php:61
+msgid "Internal links"
+msgstr ""
+
+#: includes/class-admin-report.php:62
+msgid "Related candidates"
+msgstr ""
+
+#: includes/class-admin-report.php:63
+msgid "Status"
+msgstr ""
+
+#: includes/class-admin-report.php:68
+msgid "No published posts found."
+msgstr ""
+
+#: includes/class-admin-report.php:76
+msgid "View"
+msgstr ""
+
+#: includes/class-admin-report.php:97
+msgid "Healthy"
+msgstr ""
+
+#: includes/class-admin-report.php:100
+msgid "Add internal links"
+msgstr ""
+
+#: includes/class-admin-report.php:102
+msgid "Needs related posts"
+msgstr ""
+
+#: includes/class-article-renderer.php:48
 msgid "Unknown Author"
 msgstr ""
 
+#: includes/class-article-renderer.php:51
+msgid "?"
+msgstr ""
+
+#. translators: %s: estimated reading time in minutes.
+#: includes/class-article-renderer.php:84
+#, php-format
 msgid "Long read · %s min"
 msgstr ""
 
+#. translators: %d: estimated reading time in minutes.
+#: includes/class-article-renderer.php:110
+#: includes/class-related-posts.php:127
+#, php-format
 msgid "%d min read"
 msgstr ""
 
+#: includes/class-article-renderer.php:117
 msgid "Share"
 msgstr ""
 
+#: includes/class-article-renderer.php:145
 msgid "More from this author"
+msgstr ""
+
+#: includes/class-assets.php:79
+msgid "Link copied"
+msgstr ""
+
+#: includes/class-continuous-reading.php:85
+msgid "Unknown source post."
+msgstr ""
+
+#: includes/class-stack-renderer.php:49
+msgid "Loading next article"
+msgstr ""
+
+#: assets/js/blocks.js:27
+msgid "Settings"
+msgstr ""
+
+#: assets/js/blocks.js:43
+msgid "Post Stack"
+msgstr ""
+
+#: assets/js/blocks.js:44
+msgid "Appends the continuous-reading stack for the current post."
+msgstr ""
+
+#: assets/js/blocks.js:65
+msgid "Stack size"
+msgstr ""
+
+#: assets/js/blocks.js:83
+msgid "Related Posts"
+msgstr ""
+
+#: assets/js/blocks.js:84
+msgid "Shows local related articles for the current public post."
+msgstr ""
+
+#: assets/js/blocks.js:113
+msgid "Heading"
+msgstr ""
+
+#: assets/js/blocks.js:121
+msgid "Post count"
+msgstr ""
+
+#: assets/js/blocks.js:131
+msgid "Show excerpts"
+msgstr ""
+
+#: assets/js/blocks.js:147
+msgid "Reader CTA"
+msgstr ""
+
+#: assets/js/blocks.js:148
+msgid "Adds a provider-neutral post-end call-to-action slot."
+msgstr ""
+
+#: assets/js/blocks.js:185
+msgid "Eyebrow"
+msgstr ""
+
+#: assets/js/blocks.js:193
+msgid "Title"
+msgstr ""
+
+#: assets/js/blocks.js:201
+msgid "Body"
+msgstr ""
+
+#: assets/js/blocks.js:209
+msgid "Button text"
+msgstr ""
+
+#: assets/js/blocks.js:217
+msgid "Button URL"
+msgstr ""
+
+#: blocks/post-stack/block.json
+msgctxt "block title"
+msgid "Post Stack"
+msgstr ""
+
+#: blocks/post-stack/block.json
+msgctxt "block description"
+msgid "Appends the continuous-reading stack for the current post."
+msgstr ""
+
+#: blocks/reader-cta/block.json
+msgctxt "block title"
+msgid "Reader CTA"
+msgstr ""
+
+#: blocks/reader-cta/block.json
+msgctxt "block description"
+msgid "Adds a provider-neutral post-end call-to-action slot."
+msgstr ""
+
+#: blocks/related-posts/block.json
+msgctxt "block title"
+msgid "Related Posts"
+msgstr ""
+
+#: blocks/related-posts/block.json
+msgctxt "block description"
+msgid "Shows local related articles for the current public post."
 msgstr ""

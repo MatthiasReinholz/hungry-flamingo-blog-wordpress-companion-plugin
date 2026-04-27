@@ -16,10 +16,10 @@ final class Stack_Renderer {
 	/**
 	 * @var array<int,bool>
 	 */
-	private static $rendered_post_ids = [];
+	private static $rendered_post_ids = array();
 
 	public function render_placeholders( \WP_Post $post, int $stack_size ): string {
-		if ( ! $this->is_public_post( $post ) ) {
+		if ( ! Public_Posts::is_public_post( $post ) ) {
 			return '';
 		}
 
@@ -66,12 +66,5 @@ final class Stack_Renderer {
 	public static function has_rendered_for_post( int $post_id ): bool {
 		$post_id = absint( $post_id );
 		return $post_id > 0 && ! empty( self::$rendered_post_ids[ $post_id ] );
-	}
-
-	private function is_public_post( \WP_Post $post ): bool {
-		return 'post' === $post->post_type
-			&& 'publish' === $post->post_status
-			&& '' === (string) $post->post_password
-			&& is_post_publicly_viewable( $post );
 	}
 }

@@ -1,0 +1,36 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "hfb/reader-cta",
+	"title": "Reader CTA",
+	"description": "Adds a provider-neutral post-end call-to-action slot.",
+	"category": "widgets",
+	"icon": "megaphone",
+	"textdomain": "hungry-flamingo-blog-companion",
+	"editorScript": "hfb-companion-blocks-editor",
+	"style": "hfb-companion-continuous-reading",
+	"attributes": {
+		"eyebrow": {
+			"type": "string"
+		},
+		"title": {
+			"type": "string"
+		},
+		"body": {
+			"type": "string"
+		},
+		"buttonText": {
+			"type": "string"
+		},
+		"url": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"align": [
+			"wide",
+			"full"
+		]
+	}
+}

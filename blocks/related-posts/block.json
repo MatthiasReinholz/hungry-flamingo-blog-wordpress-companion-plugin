@@ -1,0 +1,33 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "hfb/related-posts",
+	"title": "Related Posts",
+	"description": "Shows local related articles for the current public post.",
+	"category": "widgets",
+	"icon": "admin-links",
+	"textdomain": "hungry-flamingo-blog-companion",
+	"editorScript": "hfb-companion-blocks-editor",
+	"style": "hfb-companion-continuous-reading",
+	"attributes": {
+		"heading": {
+			"type": "string"
+		},
+		"count": {
+			"type": "number",
+			"default": 3,
+			"minimum": 1,
+			"maximum": 12
+		},
+		"showExcerpt": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"supports": {
+		"align": [
+			"wide",
+			"full"
+		]
+	}
+}

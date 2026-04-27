@@ -16,31 +16,15 @@ defined( 'ABSPATH' ) || exit;
 final class Post_Stack {
 
 	public function register(): void {
-		add_action( 'init', [ $this, 'register_block' ] );
+		add_action( 'init', array( $this, 'register_block' ) );
 	}
 
 	public function register_block(): void {
-		register_block_type(
-			'hfb/post-stack',
-			[
-				'api_version'     => 2,
-				'title'           => __( 'Post Stack', 'hungry-flamingo-blog-companion' ),
-				'description'     => __( 'Appends the continuous-reading stack for the current post.', 'hungry-flamingo-blog-companion' ),
-				'category'        => 'widgets',
-				'icon'            => 'welcome-write-blog',
-				'render_callback' => [ $this, 'render' ],
-				'attributes'      => [
-					'stackSize' => [
-						'type'    => 'number',
-						'default' => (int) HFB_COMPANION_STACK_SIZE,
-						'minimum' => 1,
-						'maximum' => 10,
-					],
-				],
-				'supports'        => [
-					'align' => [ 'wide', 'full' ],
-				],
-			]
+		register_block_type_from_metadata(
+			HFB_COMPANION_DIR . 'blocks/post-stack',
+			array(
+				'render_callback' => array( $this, 'render' ),
+			)
 		);
 	}
 

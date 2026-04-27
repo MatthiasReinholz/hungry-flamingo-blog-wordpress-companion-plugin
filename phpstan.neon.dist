@@ -1,0 +1,16 @@
+parameters:
+  level: 5
+  paths:
+    - hungry-flamingo-blog-companion.php
+    - includes
+    - uninstall.php
+  excludePaths:
+    - .git (?)
+    - .github (?)
+    - .wp-plugin-base (?)
+    - .wp-plugin-base-quality-pack (?)
+    - .wp-plugin-base-security-pack (?)
+    - dist (?)
+    - node_modules (?)
+    - tests
+    - vendor (?)

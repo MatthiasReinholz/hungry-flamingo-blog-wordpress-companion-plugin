@@ -1,41 +1,59 @@
-# Repository Instructions for AI Coding Agents
+# Agent Operating Contract
 
-## Scope
+This project consumes `wp-plugin-base` as vendored foundation source under `.wp-plugin-base/`.
 
-This repository is the Hungry Flamingo Blog Companion plugin. It owns functionality that belongs outside the theme: the continuous-reading stack, the public next-posts REST endpoint, and the optional `hfb/post-stack` dynamic block.
+## Project Scope
+
+This repository is the Hungry Flamingo Blog companion plugin. It owns functionality that belongs outside the theme:
+
+- continuous-reading post stack and `hfb/post-stack` dynamic block
+- public `/wp-json/hfb/v1/next-posts` REST endpoint for already-public published posts
+- optional `hfb/related-posts` and `hfb/reader-cta` dynamic blocks
+- reading progress and share/copy front-end enhancements
+- local Tools-screen editorial report
+- block metadata and small editor inspector controls for plugin-owned dynamic blocks
 
 The companion theme lives at:
 
 `/Users/matthias/DEV/wordpress/themes/hungry-flamingo-blog-wordpress-theme`
 
-## Architecture Notes
+Keep presentation-only templates, WooCommerce styling, block patterns, and theme support declarations in the theme. Keep custom blocks, REST endpoints, durable data, forms, analytics, newsletter capture, and admin tools in this plugin or another plugin.
 
-- This child repository is managed with `wp-plugin-base`; run the foundation sync before validation when foundation-managed files may be stale.
-- Keep custom blocks and REST endpoints in the plugin, not in the theme.
-- The public REST endpoint may expose only already-public, published, non-password-protected `post` objects.
-- Do not add WooCommerce product/cart/checkout/order behavior here. The plugin auto-append path must remain limited to singular `post` content.
-- Cache selected post IDs, not rendered HTML, so filters that produce request-specific markup cannot leak through a shared transient or object cache.
-- Do not add tracking, remote assets, telemetry, or third-party calls without explicit opt-in and readme privacy documentation.
-- Keep theme coupling soft through filters and documented behavior. The plugin should degrade outside the Hungry Flamingo Blog theme.
+## Privacy And Security Boundaries
 
-## Required Checks
+- Do not add tracking, analytics beacons, remote font loading, or third-party service calls without updating `README.md`, `readme.txt`, and the relevant docs.
+- The public REST endpoint must only expose public, published, non-password-protected `post` objects.
+- REST parameters must stay bounded and sanitized. Public permission callbacks must remain documented and intentionally narrow.
+- Admin screens must stay capability-gated. Do not add admin actions without nonce and capability checks.
+- The plugin intentionally does not alter WooCommerce products, carts, checkout, orders, or account pages.
 
-Run these before handing off plugin changes:
+## Working Rules
 
-```sh
+- Treat `.wp-plugin-base/` as generated/vendor foundation code. Prefer fixing reusable behavior upstream in `wp-plugin-base`, then resync this project.
+- Managed files are listed by `bash .wp-plugin-base/scripts/ci/list_managed_files.sh`. Do not permanently patch those files in place unless you are intentionally diverging from the foundation.
+- Project-specific test bootstrap code belongs in `tests/wp-plugin-base/bootstrap-child.php`, not in managed `tests/bootstrap.php`.
+- Public endpoint suppressions belong in `.wp-plugin-base-security-suppressions.json` and must keep the exact scanner-reported `kind`, `identifier`, and repo-relative `path`.
+- For child-only changes, `git diff --name-only -- .wp-plugin-base .wp-plugin-base-security-pack` should be empty before staging. If it is not empty, confirm the task is an intentional foundation update.
+
+## Validation
+
+After foundation or template updates, run:
+
+```bash
 bash .wp-plugin-base/scripts/update/sync_child_repo.sh
 bash .wp-plugin-base/scripts/ci/validate_project.sh
+```
+
+Before handing off any plugin change, run:
+
+```bash
+bash .wp-plugin-base/scripts/ci/validate_project.sh
+bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh
 bash .wp-plugin-base/scripts/ci/build_zip.sh
 ```
 
-When checking whitespace, ignore vendored foundation files unless the task is specifically to patch the foundation:
+The managed quality pack is enabled. Keep child-owned PHPUnit/bootstrap additions under `tests/wp-plugin-base/`, and keep block metadata in `blocks/*/block.json` aligned with the PHP render callbacks and `assets/js/blocks.js`.
 
-```sh
-git diff --cached --check -- . ':!.wp-plugin-base/**'
-```
+Local PHP CLIs with `memory_limit=128M` can fail PHPStan before analysis completes. Use a temporary `PHPRC` with `memory_limit=1G` for local readiness runs rather than weakening the quality pack.
 
-## Release Hygiene
-
-- Keep `hungry-flamingo-blog-companion.php`, `readme.txt`, `README.md`, `CHANGELOG.md`, `LICENSE`, and `languages/hungry-flamingo-blog-companion.pot` aligned.
-- Check the generated ZIP contents after foundation packaging.
-- Do not patch `.wp-plugin-base` vendored files in this child repo unless the user explicitly asks for a local foundation fork. Prefer upstream fixes in `MatthiasReinholz/wp-plugin-base`.
+For release changes, also run the release preparation workflow or local release checks documented in `CONTRIBUTING.md` before merging.

@@ -12,7 +12,7 @@ Companion functionality for the Hungry Flamingo Blog theme.
 
 == Description ==
 
-Hungry Flamingo Blog Companion contains functionality that should live outside the theme: the continuous-reading post stack, the public next-posts REST endpoint, and the optional `hfb/post-stack` dynamic block.
+Hungry Flamingo Blog Companion contains functionality that should live outside the theme: the continuous-reading post stack, the public next-posts REST endpoint, optional reader-retention dynamic blocks with editor controls, a reading progress indicator, and a local editorial report.
 
 The plugin is designed for the Hungry Flamingo Blog theme but keeps the feature portable so the theme itself can stay focused on design, templates, and presentation. Developer and AI coding-agent guidance is included in `AGENTS.md` in the source repository.
 
@@ -20,9 +20,10 @@ The plugin intentionally does not alter WooCommerce products, carts, checkout, o
 
 == Installation ==
 
-1. Upload the plugin directory to `wp-content/plugins/`.
+1. Upload the installable release ZIP or extracted release directory to WordPress.
 2. Activate Hungry Flamingo Blog Companion in Plugins.
 3. Visit a single post. The plugin appends a continuous-reading stack after the post content.
+4. Optional: insert the Related Posts or Reader CTA blocks in post templates or individual posts.
 
 == Frequently Asked Questions ==
 
@@ -42,8 +43,13 @@ No. WooCommerce compatibility belongs to the theme and WooCommerce itself. This 
 
 No. The plugin does not set cookies, track users, or make server-side calls to external services. The public REST endpoint returns rendered markup for public posts only, and its short-lived object-cache entry stores selected post IDs rather than rendered HTML. Rendered author avatars use WordPress' configured avatar system; on default WordPress installs, visitors' browsers may request avatar images from Gravatar.
 
+= What does the editorial report do? =
+
+Tools > Hungry Flamingo reviews recent published posts for word count, internal links, and related-post candidates. The report is local to WordPress and requires `manage_options`.
+
 == Changelog ==
 
 = 1.0.0 =
 
-Initial beta release.
+- Initial beta release.
+- Added continuous reading, related-post and reader-CTA blocks, reading progress, and a local editorial report.

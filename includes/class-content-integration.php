@@ -16,7 +16,7 @@ final class Content_Integration {
 	private $did_append = false;
 
 	public function register(): void {
-		add_filter( 'render_block', [ $this, 'append_stack_after_post_content' ], 20, 2 );
+		add_filter( 'render_block', array( $this, 'append_stack_after_post_content' ), 20, 2 );
 	}
 
 	/**
@@ -65,12 +65,28 @@ final class Content_Integration {
 		}
 
 		$contains = false;
-		$slugs    = [ 'single', 'singular', 'index' ];
+		$slugs    = array( 'single-post', 'single', 'singular', 'index' );
 
 		if ( function_exists( 'get_block_template' ) ) {
 			foreach ( $slugs as $slug ) {
 				$template = get_block_template( get_stylesheet() . '//' . $slug, 'wp_template' );
 				if ( $template && ! empty( $template->content ) && has_block( 'hfb/post-stack', $template->content ) ) {
+					$contains = true;
+					break;
+				}
+			}
+		}
+
+		if ( ! $contains && function_exists( 'get_block_templates' ) ) {
+			$template_parts = get_block_templates(
+				array(
+					'theme' => get_stylesheet(),
+				),
+				'wp_template_part'
+			);
+
+			foreach ( $template_parts as $template_part ) {
+				if ( has_block( 'hfb/post-stack', $template_part->content ) ) {
 					$contains = true;
 					break;
 				}
@@ -88,6 +104,23 @@ final class Content_Integration {
 				if ( has_block( 'hfb/post-stack', $template_content ) ) {
 					$contains = true;
 					break;
+				}
+			}
+		}
+
+		if ( ! $contains ) {
+			$part_paths = glob( trailingslashit( get_stylesheet_directory() ) . 'parts/*.html' );
+			if ( is_array( $part_paths ) ) {
+				foreach ( $part_paths as $part_path ) {
+					if ( ! is_readable( $part_path ) ) {
+						continue;
+					}
+
+					$template_part_content = (string) file_get_contents( $part_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+					if ( has_block( 'hfb/post-stack', $template_part_content ) ) {
+						$contains = true;
+						break;
+					}
 				}
 			}
 		}

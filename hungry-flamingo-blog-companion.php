@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Hungry Flamingo Blog Companion
  * Plugin URI: https://github.com/MatthiasReinholz/hungry-flamingo-blog-wordpress-companion-plugin
- * Description: Adds the continuous-reading post stack and optional post-stack block for the Hungry Flamingo Blog theme.
+ * Description: Adds continuous reading, related-post blocks, reader CTAs, reading progress, and a local editorial report for Hungry Flamingo Blog.
  * Version: 1.0.0
  * Requires at least: 6.4
  * Requires PHP: 8.2
@@ -21,21 +21,23 @@ declare( strict_types=1 );
 defined( 'ABSPATH' ) || exit;
 
 define( 'HFB_COMPANION_VERSION', '1.0.0' );
-define( 'HFB_COMPANION_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
-define( 'HFB_COMPANION_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
+define( 'HFB_COMPANION_DIR', __DIR__ . '/' );
+$hfb_companion_plugin_url = function_exists( 'plugin_dir_url' ) ? rtrim( plugin_dir_url( __FILE__ ), '/' ) . '/' : '';
+define( 'HFB_COMPANION_URL', $hfb_companion_plugin_url );
 define( 'HFB_COMPANION_STACK_SIZE', 5 );
+unset( $hfb_companion_plugin_url );
 
 if ( ! defined( 'HFB_COMPANION_TEXT_DOMAIN' ) ) {
 	define( 'HFB_COMPANION_TEXT_DOMAIN', 'hungry-flamingo-blog-companion' );
 }
 
 spl_autoload_register(
-	static function ( string $class ): void {
-		if ( strpos( $class, 'HFB_Companion\\' ) !== 0 ) {
+	static function ( string $class_name ): void {
+		if ( strpos( $class_name, 'HFB_Companion\\' ) !== 0 ) {
 			return;
 		}
 
-		$relative = substr( $class, 14 );
+		$relative = substr( $class_name, 14 );
 		$parts    = explode( '\\', $relative );
 		$file     = array_pop( $parts );
 		$path     = array_map(
@@ -54,9 +56,11 @@ spl_autoload_register(
 	}
 );
 
-add_action(
-	'plugins_loaded',
-	static function (): void {
-		( new HFB_Companion\Plugin() )->boot();
-	}
-);
+if ( function_exists( 'add_action' ) ) {
+	add_action(
+		'plugins_loaded',
+		static function (): void {
+			( new HFB_Companion\Plugin() )->boot();
+		}
+	);
+}

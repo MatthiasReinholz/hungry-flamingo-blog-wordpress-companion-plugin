@@ -13,23 +13,21 @@ defined( 'ABSPATH' ) || exit;
 
 final class Article_Renderer {
 
-	private const WORDS_PER_MINUTE = 225;
-
 	/**
 	 * @param array<string,mixed> $args Rendering context.
 	 */
-	public function render( \WP_Post $post, array $args = [] ): string {
+	public function render( \WP_Post $post, array $args = array() ): string {
 		if ( post_password_required( $post ) ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core password form filter.
 			return (string) apply_filters( 'the_password_form', '', $post );
 		}
 
 		$context = $args['context'] ?? 'stack';
-		if ( ! in_array( $context, [ 'main', 'stack' ], true ) ) {
+		if ( ! in_array( $context, array( 'main', 'stack' ), true ) ) {
 			$context = 'stack';
 		}
 
-		$category = $this->primary_category( (int) $post->ID );
+		$category = Primary_Category::term_for_post( (int) $post->ID );
 		$author   = (int) $post->post_author;
 
 		$title     = get_the_title( $post );
@@ -37,14 +35,14 @@ final class Article_Renderer {
 		$excerpt   = wp_strip_all_tags( get_the_excerpt( $post ) );
 		$date_iso  = get_the_date( 'c', $post );
 		$date_ui   = get_the_date( '', $post );
-		$reading   = $this->reading_time( $post );
+		$reading   = Reading_Time::for_post( $post );
 
 		$author_user = get_user_by( 'id', $author );
 		if ( $author_user ) {
 			$display_name    = $author_user->display_name;
 			$author_name     = $display_name;
 			$author_bio      = get_the_author_meta( 'description', $author );
-			$author_avatar   = get_avatar_url( $author, [ 'size' => 96 ] );
+			$author_avatar   = get_avatar_url( $author, array( 'size' => 96 ) );
 			$author_initials = $this->initials( $display_name );
 		} else {
 			$author_name     = __( 'Unknown Author', 'hungry-flamingo-blog-companion' );
@@ -104,10 +102,14 @@ final class Article_Renderer {
 					</div>
 					<div>
 							<div class="article-meta-bar__author"><?php echo esc_html( $author_name ); ?></div>
-							<time datetime="<?php echo esc_attr( $date_iso ); ?>"><?php echo esc_html( $date_ui ); ?> · <?php
-							/* translators: %d: estimated reading time in minutes. */
-							printf( esc_html__( '%d min read', 'hungry-flamingo-blog-companion' ), (int) $reading );
-						?></time>
+							<time datetime="<?php echo esc_attr( $date_iso ); ?>">
+							<?php
+								echo esc_html( $date_ui );
+								echo ' &middot; ';
+								/* translators: %d: estimated reading time in minutes. */
+								printf( esc_html__( '%d min read', 'hungry-flamingo-blog-companion' ), (int) $reading );
+							?>
+						</time>
 					</div>
 					<div class="spacer"></div>
 						<button type="button" class="share-btn" data-hfb-share="<?php echo esc_url( $permalink ); ?>">
@@ -120,7 +122,7 @@ final class Article_Renderer {
 
 			<?php if ( has_post_thumbnail( $post ) ) : ?>
 				<figure class="hfb-article__feature">
-					<?php echo wp_kses_post( get_the_post_thumbnail( $post, 'full', [ 'loading' => 'lazy' ] ) ); ?>
+					<?php echo wp_kses_post( get_the_post_thumbnail( $post, 'full', array( 'loading' => 'lazy' ) ) ); ?>
 				</figure>
 			<?php endif; ?>
 
@@ -150,16 +152,11 @@ final class Article_Renderer {
 		return (string) ob_get_clean();
 	}
 
-	private function reading_time( \WP_Post $post ): int {
-		$word_count = str_word_count( wp_strip_all_tags( (string) $post->post_content ) );
-		return max( 1, (int) ceil( $word_count / self::WORDS_PER_MINUTE ) );
-	}
-
 	/**
 	 * @return array<string,array<string,bool>>
 	 */
 	private static function svg_kses(): array {
-		$shape_attrs = [
+		$shape_attrs = array(
 			'fill'            => true,
 			'stroke'          => true,
 			'stroke-width'    => true,
@@ -168,66 +165,54 @@ final class Article_Renderer {
 			'class'           => true,
 			'aria-hidden'     => true,
 			'focusable'       => true,
-		];
+		);
 
-		return [
+		return array(
 			'svg'      => array_merge(
 				$shape_attrs,
-				[
+				array(
 					'xmlns'   => true,
 					'viewBox' => true,
 					'width'   => true,
 					'height'  => true,
-				]
+				)
 			),
 			'g'        => $shape_attrs,
-			'path'     => array_merge( $shape_attrs, [ 'd' => true ] ),
+			'path'     => array_merge( $shape_attrs, array( 'd' => true ) ),
 			'circle'   => array_merge(
 				$shape_attrs,
-				[
+				array(
 					'cx' => true,
 					'cy' => true,
 					'r'  => true,
-				]
+				)
 			),
 			'rect'     => array_merge(
 				$shape_attrs,
-				[
+				array(
 					'x'      => true,
 					'y'      => true,
 					'width'  => true,
 					'height' => true,
-				]
+				)
 			),
 			'line'     => array_merge(
 				$shape_attrs,
-				[
+				array(
 					'x1' => true,
 					'y1' => true,
 					'x2' => true,
 					'y2' => true,
-				]
+				)
 			),
-			'polyline' => array_merge( $shape_attrs, [ 'points' => true ] ),
-			'polygon'  => array_merge( $shape_attrs, [ 'points' => true ] ),
-		];
-	}
-
-	private function primary_category( int $post_id ): ?\WP_Term {
-		$yoast_primary = (int) get_post_meta( $post_id, '_yoast_wpseo_primary_category', true );
-		if ( $yoast_primary ) {
-			$term = get_term( $yoast_primary, 'category' );
-			if ( $term instanceof \WP_Term ) {
-				return $term;
-			}
-		}
-
-		$terms = get_the_category( $post_id );
-		return $terms ? $terms[0] : null;
+			'polyline' => array_merge( $shape_attrs, array( 'points' => true ) ),
+			'polygon'  => array_merge( $shape_attrs, array( 'points' => true ) ),
+		);
 	}
 
 	private function initials( string $name ): string {
-		$parts = preg_split( '/\s+/', trim( $name ) ) ?: [];
+		$parts = preg_split( '/\s+/', trim( $name ) );
+		$parts = is_array( $parts ) ? $parts : array();
 		$take  = array_slice( $parts, 0, 2 );
 		$out   = '';
 
@@ -235,6 +220,6 @@ final class Article_Renderer {
 			$out .= function_exists( 'mb_substr' ) ? mb_substr( $part, 0, 1 ) : substr( $part, 0, 1 );
 		}
 
-		return strtoupper( $out ?: '·' );
+		return strtoupper( '' !== $out ? $out : '·' );
 	}
 }
