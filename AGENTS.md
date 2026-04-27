@@ -1,6 +1,26 @@
+<!-- wp-plugin-base:agents-start -->
 # Agent Operating Contract
 
 This project consumes `wp-plugin-base` as vendored foundation source under `.wp-plugin-base/`.
+
+## Working Rules
+
+- Treat `.wp-plugin-base/` as generated/vendor foundation code. Prefer fixing reusable behavior upstream in `wp-plugin-base`, then resync this project.
+- Managed files are listed by `bash .wp-plugin-base/scripts/ci/list_managed_files.sh --mode validate`. Do not permanently patch those files in place unless you are intentionally diverging from the foundation.
+- Project-specific test bootstrap code belongs in `tests/wp-plugin-base/bootstrap-child.php`, not in managed `tests/bootstrap.php`.
+- Public endpoint suppressions belong in `.wp-plugin-base-security-suppressions.json` and must keep the exact scanner-reported `kind`, `identifier`, and repo-relative `path`.
+
+## Validation
+
+After foundation or template updates, run:
+
+```bash
+bash .wp-plugin-base/scripts/update/sync_child_repo.sh
+bash .wp-plugin-base/scripts/ci/validate_project.sh
+```
+
+For release changes, also run the release preparation workflow or local release checks documented in `CONTRIBUTING.md` before merging.
+<!-- wp-plugin-base:agents-end -->
 
 ## Project Scope
 
@@ -27,22 +47,12 @@ Keep presentation-only templates, WooCommerce styling, block patterns, and theme
 - Admin screens must stay capability-gated. Do not add admin actions without nonce and capability checks.
 - The plugin intentionally does not alter WooCommerce products, carts, checkout, orders, or account pages.
 
-## Working Rules
+## Project Working Rules
 
-- Treat `.wp-plugin-base/` as generated/vendor foundation code. Prefer fixing reusable behavior upstream in `wp-plugin-base`, then resync this project.
-- Managed files are listed by `bash .wp-plugin-base/scripts/ci/list_managed_files.sh`. Do not permanently patch those files in place unless you are intentionally diverging from the foundation.
-- Project-specific test bootstrap code belongs in `tests/wp-plugin-base/bootstrap-child.php`, not in managed `tests/bootstrap.php`.
-- Public endpoint suppressions belong in `.wp-plugin-base-security-suppressions.json` and must keep the exact scanner-reported `kind`, `identifier`, and repo-relative `path`.
 - For child-only changes, `git diff --name-only -- .wp-plugin-base .wp-plugin-base-security-pack` should be empty before staging. If it is not empty, confirm the task is an intentional foundation update.
-
-## Validation
-
-After foundation or template updates, run:
-
-```bash
-bash .wp-plugin-base/scripts/update/sync_child_repo.sh
-bash .wp-plugin-base/scripts/ci/validate_project.sh
-```
+- Keep child-owned PHPUnit/bootstrap additions under `tests/wp-plugin-base/`.
+- Keep block metadata in `blocks/*/block.json` aligned with PHP render callbacks and `assets/js/blocks.js`.
+- Local PHP CLIs with `memory_limit=128M` can fail PHPStan before analysis completes. Keep `PHPSTAN_MEMORY_LIMIT=1G` in `.wp-plugin-base.env` rather than weakening the quality pack.
 
 Before handing off any plugin change, run:
 
@@ -51,9 +61,3 @@ bash .wp-plugin-base/scripts/ci/validate_project.sh
 bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh
 bash .wp-plugin-base/scripts/ci/build_zip.sh
 ```
-
-The managed quality pack is enabled. Keep child-owned PHPUnit/bootstrap additions under `tests/wp-plugin-base/`, and keep block metadata in `blocks/*/block.json` aligned with the PHP render callbacks and `assets/js/blocks.js`.
-
-Local PHP CLIs with `memory_limit=128M` can fail PHPStan before analysis completes. Use a temporary `PHPRC` with `memory_limit=1G` for local readiness runs rather than weakening the quality pack.
-
-For release changes, also run the release preparation workflow or local release checks documented in `CONTRIBUTING.md` before merging.
