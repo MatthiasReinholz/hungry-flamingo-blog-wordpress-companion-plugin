@@ -17,48 +17,48 @@ final class Continuous_Reading {
 	private const ROUTE = '/next-posts';
 
 	public function register(): void {
-		add_action( 'rest_api_init', [ $this, 'register_route' ] );
-		add_action( 'save_post_post', [ $this, 'invalidate_cache' ] );
-		add_action( 'deleted_post', [ $this, 'invalidate_cache' ] );
+		add_action( 'rest_api_init', array( $this, 'register_route' ) );
+		add_action( 'save_post_post', array( $this, 'invalidate_cache' ) );
+		add_action( 'deleted_post', array( $this, 'invalidate_cache' ) );
 	}
 
 	public function register_route(): void {
 		register_rest_route(
 			self::NS,
 			self::ROUTE,
-			[
+			array(
 				'methods'             => \WP_REST_Server::READABLE,
-				'permission_callback' => [ $this, 'permission_check' ],
-				'args'                => [
-					'after'   => [
+				'permission_callback' => array( $this, 'permission_check' ),
+				'args'                => array(
+					'after' => array(
 						'required'          => true,
 						'type'              => 'integer',
 						'sanitize_callback' => 'absint',
-					],
-					'count'   => [
+					),
+					'count' => array(
 						'required'          => false,
 						'type'              => 'integer',
 						'default'           => (int) HFB_COMPANION_STACK_SIZE - 1,
 						'minimum'           => 1,
 						'maximum'           => 10,
 						'sanitize_callback' => 'absint',
-					],
-					'seen'    => [
+					),
+					'seen'  => array(
 						'required'          => false,
 						'type'              => 'array',
-						'default'           => [],
-						'items'             => [
+						'default'           => array(),
+						'items'             => array(
 							'type'    => 'integer',
 							'minimum' => 1,
-						],
+						),
 						'maxItems'          => 100,
 						'sanitize_callback' => static function ( $value ): array {
 							return array_slice( array_map( 'absint', (array) $value ), 0, 100 );
 						},
-					],
-				],
-				'callback'            => [ $this, 'handle' ],
-			]
+					),
+				),
+				'callback'            => array( $this, 'handle' ),
+			)
 		);
 	}
 
@@ -81,14 +81,14 @@ final class Continuous_Reading {
 		$seen   = array_slice( array_map( 'absint', (array) $seen ), 0, 100 );
 		$source = get_post( $after );
 
-		if ( ! $this->is_public_post( $source ) ) {
-			return new \WP_Error( 'hfb_companion_invalid_post', __( 'Unknown source post.', 'hungry-flamingo-blog-companion' ), [ 'status' => 404 ] );
+		if ( ! Public_Posts::is_public_post( $source ) ) {
+			return new \WP_Error( 'hfb_companion_invalid_post', __( 'Unknown source post.', 'hungry-flamingo-blog-companion' ), array( 'status' => 404 ) );
 		}
 
 		$ids = null;
-		if ( [] === $seen ) {
+		if ( array() === $seen ) {
 			$cache_version = (int) get_option( 'hfb_companion_cr_cache_ver', 0 );
-			$cache_key     = 'hfb_companion_cr_ids_' . $cache_version . '_' . md5( (string) wp_json_encode( [ $after, $count ] ) );
+			$cache_key     = 'hfb_companion_cr_ids_' . $cache_version . '_' . md5( (string) wp_json_encode( array( $after, $count ) ) );
 			$cache_group   = 'hfb_companion';
 			$cache_ttl     = 5 * MINUTE_IN_SECONDS;
 			$cached        = wp_cache_get( $cache_key, $cache_group );
@@ -99,21 +99,21 @@ final class Continuous_Reading {
 		}
 
 		if ( null === $ids ) {
-			$excluded = array_unique( array_merge( [ $after ], $seen ) );
+			$excluded = array_unique( array_merge( array( $after ), $seen ) );
 			$ids      = $this->pick_posts( $after, $count, $excluded );
 
-			if ( [] === $seen ) {
+			if ( array() === $seen ) {
 				wp_cache_set( $cache_key, $ids, $cache_group, $cache_ttl );
 			}
 		}
 
-		$items = [];
+		$items = array();
 
 		foreach ( $ids as $id ) {
 			$items[] = $this->serialize_post( $id );
 		}
 
-		$payload = [ 'items' => array_values( array_filter( $items ) ) ];
+		$payload = array( 'items' => array_values( array_filter( $items ) ) );
 
 		return rest_ensure_response( $payload );
 	}
@@ -133,13 +133,13 @@ final class Continuous_Reading {
 	 * @return int[]
 	 */
 	private function pick_posts( int $source_id, int $count, array $excluded ): array {
-		$collected        = [];
-		$primary_category = $this->primary_category( $source_id );
+		$collected        = array();
+		$primary_category = Primary_Category::id_for_post( $source_id );
 		$source_date      = get_the_date( 'Y-m-d H:i:s', $source_id );
 
 		if ( $primary_category ) {
 			$same = get_posts(
-				[
+				array(
 					'category'               => $primary_category,
 					'posts_per_page'         => $this->query_limit( $count, $excluded ),
 					'post_status'            => 'publish',
@@ -148,15 +148,15 @@ final class Continuous_Reading {
 					'fields'                 => 'ids',
 					'orderby'                => 'date',
 					'order'                  => 'DESC',
-					'date_query'             => [
-						[
+					'date_query'             => array(
+						array(
 							'before' => $source_date,
-						],
-					],
+						),
+					),
 					'no_found_rows'          => true,
 					'update_post_term_cache' => false,
 					'update_post_meta_cache' => false,
-				]
+				)
 			);
 
 			$collected = array_merge( $collected, $this->remove_excluded( $same, $excluded, $count ) );
@@ -166,7 +166,7 @@ final class Continuous_Reading {
 			$need    = $count - count( $collected );
 			$exclude = array_unique( array_merge( $excluded, $collected ) );
 			$fill    = get_posts(
-				[
+				array(
 					'posts_per_page'         => $this->query_limit( $need, $exclude ),
 					'post_status'            => 'publish',
 					'has_password'           => false,
@@ -174,15 +174,15 @@ final class Continuous_Reading {
 					'fields'                 => 'ids',
 					'orderby'                => 'date',
 					'order'                  => 'DESC',
-					'date_query'             => [
-						[
+					'date_query'             => array(
+						array(
 							'before' => $source_date,
-						],
-					],
+						),
+					),
 					'no_found_rows'          => true,
 					'update_post_term_cache' => false,
 					'update_post_meta_cache' => false,
-				]
+				)
 			);
 
 			$collected = array_merge( $collected, $this->remove_excluded( $fill, $exclude, $need ) );
@@ -192,7 +192,7 @@ final class Continuous_Reading {
 			$need    = $count - count( $collected );
 			$exclude = array_unique( array_merge( $excluded, $collected ) );
 			$wrap    = get_posts(
-				[
+				array(
 					'posts_per_page'         => $this->query_limit( $need, $exclude ),
 					'post_status'            => 'publish',
 					'has_password'           => false,
@@ -203,7 +203,7 @@ final class Continuous_Reading {
 					'no_found_rows'          => true,
 					'update_post_term_cache' => false,
 					'update_post_meta_cache' => false,
-				]
+				)
 			);
 
 			$collected = array_merge( $collected, $this->remove_excluded( $wrap, $exclude, $need ) );
@@ -229,39 +229,29 @@ final class Continuous_Reading {
 		return array_slice( array_values( array_diff( $ids, $excluded ) ), 0, $count );
 	}
 
-	private function primary_category( int $post_id ): int {
-		$yoast_primary = (int) get_post_meta( $post_id, '_yoast_wpseo_primary_category', true );
-		if ( $yoast_primary && term_exists( $yoast_primary, 'category' ) ) {
-			return $yoast_primary;
-		}
-
-		$categories = wp_get_post_categories( $post_id );
-		return $categories ? (int) $categories[0] : 0;
-	}
-
 	/**
 	 * @return array<string,mixed>|null
 	 */
 	private function serialize_post( int $post_id ): ?array {
 		$post = get_post( $post_id );
-		if ( ! $this->is_public_post( $post ) ) {
+		if ( ! Public_Posts::is_public_post( $post ) ) {
 			return null;
 		}
 
-		$previous_post = $GLOBALS['post'] ?? null;
+		$previous_post   = $GLOBALS['post'] ?? null;
 		$GLOBALS['post'] = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		setup_postdata( $post );
 
 		try {
 			$renderer = new Article_Renderer();
-			$html     = $renderer->render( $post, [ 'context' => 'stack' ] );
+			$html     = $renderer->render( $post, array( 'context' => 'stack' ) );
 
-			return [
+			return array(
 				'id'        => $post_id,
 				'permalink' => get_permalink( $post_id ),
 				'title'     => get_the_title( $post_id ),
 				'html'      => $html,
-			];
+			);
 		} catch ( \Throwable $throwable ) {
 			do_action( 'hfb_companion_continuous_reading_render_failed', $post_id, $throwable );
 			return null;
@@ -275,16 +265,5 @@ final class Continuous_Reading {
 				unset( $GLOBALS['post'] );
 			}
 		}
-	}
-
-	private function is_public_post( $post ): bool {
-		if ( ! $post instanceof \WP_Post ) {
-			return false;
-		}
-
-		return 'post' === $post->post_type
-			&& 'publish' === $post->post_status
-			&& '' === (string) $post->post_password
-			&& is_post_publicly_viewable( $post );
 	}
 }

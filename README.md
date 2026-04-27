@@ -6,6 +6,7 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 - Public `/wp-json/hfb/v1/next-posts` REST endpoint.
 - Optional `hfb/post-stack` dynamic block for manual placement.
 - Optional `hfb/related-posts` and `hfb/reader-cta` dynamic blocks.
+- Block metadata and editor inspector controls for the companion blocks.
 - Local reading progress indicator on singular public posts.
 - Tools-screen editorial report for internal links and related-post candidates.
 - Share/copy behavior for stacked articles.
@@ -25,6 +26,10 @@ bash .wp-plugin-base/scripts/update/sync_child_repo.sh
 bash .wp-plugin-base/scripts/ci/validate_project.sh
 bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh
 ```
+
+Readiness validation includes the managed WordPress quality pack: PHP syntax, PHPCS/WPCS, PHPStan, PHPUnit bootstrap tests, Plugin Check, the security pack, and strict PHP runtime smoke checks across PHP 8.2, 8.3, and 8.4.
+
+If a local PHP CLI is capped at `128M`, run readiness with a temporary PHP config that raises `memory_limit`; PHPStan's WordPress stubs can exceed 128 MB even for this small plugin.
 
 ## Release
 

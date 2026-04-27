@@ -17,39 +17,15 @@ defined( 'ABSPATH' ) || exit;
 final class Related_Posts {
 
 	public function register(): void {
-		add_action( 'init', [ $this, 'register_block' ] );
+		add_action( 'init', array( $this, 'register_block' ) );
 	}
 
 	public function register_block(): void {
-		register_block_type(
-			'hfb/related-posts',
-			[
-				'api_version'     => 2,
-				'title'           => __( 'Related Posts', 'hungry-flamingo-blog-companion' ),
-				'description'     => __( 'Shows local related articles for the current public post.', 'hungry-flamingo-blog-companion' ),
-				'category'        => 'widgets',
-				'icon'            => 'admin-links',
-				'render_callback' => [ $this, 'render' ],
-				'attributes'      => [
-					'heading'     => [
-						'type'    => 'string',
-						'default' => __( 'Read next', 'hungry-flamingo-blog-companion' ),
-					],
-					'count'       => [
-						'type'    => 'number',
-						'default' => 3,
-						'minimum' => 1,
-						'maximum' => 12,
-					],
-					'showExcerpt' => [
-						'type'    => 'boolean',
-						'default' => true,
-					],
-				],
-				'supports'        => [
-					'align' => [ 'wide', 'full' ],
-				],
-			]
+		register_block_type_from_metadata(
+			HFB_COMPANION_DIR . 'blocks/related-posts',
+			array(
+				'render_callback' => array( $this, 'render' ),
+			)
 		);
 	}
 
@@ -73,13 +49,16 @@ final class Related_Posts {
 		}
 
 		$renderer = new Related_Posts_Renderer();
+		$heading  = array_key_exists( 'heading', $attributes )
+			? (string) $attributes['heading']
+			: __( 'Read next', 'hungry-flamingo-blog-companion' );
 		$html     = $renderer->render(
 			$post,
-			[
-				'heading'      => $attributes['heading'] ?? __( 'Read next', 'hungry-flamingo-blog-companion' ),
+			array(
+				'heading'      => $heading,
 				'count'        => $attributes['count'] ?? 3,
 				'show_excerpt' => $attributes['showExcerpt'] ?? true,
-			]
+			)
 		);
 
 		if ( '' === $html && current_user_can( 'edit_posts' ) ) {

@@ -12,7 +12,7 @@ Companion functionality for the Hungry Flamingo Blog theme.
 
 == Description ==
 
-Hungry Flamingo Blog Companion contains functionality that should live outside the theme: the continuous-reading post stack, the public next-posts REST endpoint, optional reader-retention dynamic blocks, a reading progress indicator, and a local editorial report.
+Hungry Flamingo Blog Companion contains functionality that should live outside the theme: the continuous-reading post stack, the public next-posts REST endpoint, optional reader-retention dynamic blocks with editor controls, a reading progress indicator, and a local editorial report.
 
 The plugin is designed for the Hungry Flamingo Blog theme but keeps the feature portable so the theme itself can stay focused on design, templates, and presentation. Developer and AI coding-agent guidance is included in `AGENTS.md` in the source repository.
 

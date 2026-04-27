@@ -32,12 +32,12 @@ if ( ! defined( 'HFB_COMPANION_TEXT_DOMAIN' ) ) {
 }
 
 spl_autoload_register(
-	static function ( string $class ): void {
-		if ( strpos( $class, 'HFB_Companion\\' ) !== 0 ) {
+	static function ( string $class_name ): void {
+		if ( strpos( $class_name, 'HFB_Companion\\' ) !== 0 ) {
 			return;
 		}
 
-		$relative = substr( $class, 14 );
+		$relative = substr( $class_name, 14 );
 		$parts    = explode( '\\', $relative );
 		$file     = array_pop( $parts );
 		$path     = array_map(

@@ -11,6 +11,7 @@ This repository is the Hungry Flamingo Blog companion plugin. It owns functional
 - optional `hfb/related-posts` and `hfb/reader-cta` dynamic blocks
 - reading progress and share/copy front-end enhancements
 - local Tools-screen editorial report
+- block metadata and small editor inspector controls for plugin-owned dynamic blocks
 
 The companion theme lives at:
 
@@ -50,5 +51,9 @@ bash .wp-plugin-base/scripts/ci/validate_project.sh
 bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh
 bash .wp-plugin-base/scripts/ci/build_zip.sh
 ```
+
+The managed quality pack is enabled. Keep child-owned PHPUnit/bootstrap additions under `tests/wp-plugin-base/`, and keep block metadata in `blocks/*/block.json` aligned with the PHP render callbacks and `assets/js/blocks.js`.
+
+Local PHP CLIs with `memory_limit=128M` can fail PHPStan before analysis completes. Use a temporary `PHPRC` with `memory_limit=1G` for local readiness runs rather than weakening the quality pack.
 
 For release changes, also run the release preparation workflow or local release checks documented in `CONTRIBUTING.md` before merging.

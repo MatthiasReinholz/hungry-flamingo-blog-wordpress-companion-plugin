@@ -16,7 +16,7 @@ final class Admin_Report {
 	private ?Related_Posts $related_posts = null;
 
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'register_page' ] );
+		add_action( 'admin_menu', array( $this, 'register_page' ) );
 	}
 
 	public function register_page(): void {
@@ -25,7 +25,7 @@ final class Admin_Report {
 			__( 'Hungry Flamingo', 'hungry-flamingo-blog-companion' ),
 			'manage_options',
 			'hfb-editorial-report',
-			[ $this, 'render_page' ]
+			array( $this, 'render_page' )
 		);
 	}
 
@@ -35,7 +35,7 @@ final class Admin_Report {
 		}
 
 		$posts = get_posts(
-			[
+			array(
 				'post_type'              => 'post',
 				'post_status'            => 'publish',
 				'posts_per_page'         => 30,
@@ -45,7 +45,7 @@ final class Admin_Report {
 				'no_found_rows'          => true,
 				'update_post_term_cache' => false,
 				'update_post_meta_cache' => false,
-			]
+			)
 		);
 
 		?>
@@ -102,12 +102,12 @@ final class Admin_Report {
 			$status = __( 'Needs related posts', 'hungry-flamingo-blog-companion' );
 		}
 
-		return [
+		return array(
 			'words'              => $words,
 			'internal_links'     => $internal_links,
 			'related_candidates' => $related_candidates,
 			'status'             => $status,
-		];
+		);
 	}
 
 	private function count_internal_links( string $html ): int {
@@ -119,20 +119,20 @@ final class Admin_Report {
 		$home_host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
 		$count     = 0;
 
-		foreach ( $matches[1] ?? [] as $href ) {
+		foreach ( $matches[1] as $href ) {
 			$href = trim( html_entity_decode( (string) $href, ENT_QUOTES ) );
 			if ( '' === $href || '#' === $href[0] || str_starts_with( $href, 'mailto:' ) || str_starts_with( $href, 'tel:' ) ) {
 				continue;
 			}
 
 			if ( str_starts_with( $href, '/' ) && ! str_starts_with( $href, '//' ) ) {
-				$count++;
+				++$count;
 				continue;
 			}
 
 			$host = (string) wp_parse_url( $href, PHP_URL_HOST );
 			if ( $host && $home_host && strtolower( $host ) === strtolower( $home_host ) ) {
-				$count++;
+				++$count;
 			}
 		}
 
