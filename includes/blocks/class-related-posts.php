@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace HFB_Companion\Blocks;
 
+use HFB_Companion\Assets;
 use HFB_Companion\Related_Posts as Related_Posts_Renderer;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,6 +57,8 @@ final class Related_Posts {
 	 * @param array<string,mixed> $attributes Block attributes.
 	 */
 	public function render( array $attributes ): string {
+		Assets::enqueue_block_styles();
+
 		if ( ! is_singular( 'post' ) ) {
 			return current_user_can( 'edit_posts' )
 				? '<div class="hfb-related-posts hfb-related-posts--empty">' . esc_html__( 'Related Posts appears on singular public posts.', 'hungry-flamingo-blog-companion' ) . '</div>'

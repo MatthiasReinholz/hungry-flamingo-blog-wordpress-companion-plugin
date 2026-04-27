@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace HFB_Companion\Blocks;
 
+use HFB_Companion\Assets;
+
 defined( 'ABSPATH' ) || exit;
 
 final class Reader_Cta {
@@ -60,6 +62,8 @@ final class Reader_Cta {
 	 * @param array<string,mixed> $attributes Block attributes.
 	 */
 	public function render( array $attributes ): string {
+		Assets::enqueue_block_styles();
+
 		$eyebrow     = isset( $attributes['eyebrow'] ) ? wp_strip_all_tags( (string) $attributes['eyebrow'] ) : '';
 		$title       = isset( $attributes['title'] ) ? wp_strip_all_tags( (string) $attributes['title'] ) : '';
 		$body        = isset( $attributes['body'] ) ? wp_strip_all_tags( (string) $attributes['body'] ) : '';

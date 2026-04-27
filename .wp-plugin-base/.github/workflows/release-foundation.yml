@@ -72,9 +72,35 @@ jobs:
       - name: Verify release tag comes from a merged release PR
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
+          set -euo pipefail
           COMMIT_SHA="$(git rev-parse HEAD)"
-          bash scripts/ci/check_release_pr.sh "${GITHUB_REPOSITORY}" "${{ steps.version.outputs.value }}" "$COMMIT_SHA"
+          response="$(
+            curl -fsSL \
+              --connect-timeout 10 \
+              --max-time 60 \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/pulls"
+          )"
+          match_count="$(
+            jq --arg version "$VERSION" --arg sha "$COMMIT_SHA" '
+              map(
+                select(
+                  .merged_at != null and
+                  .base.ref == "main" and
+                  (.head.ref == ("release/" + $version) or .head.ref == ("hotfix/" + $version)) and
+                  .merge_commit_sha == $sha
+                )
+              ) | length
+            ' <<<"$response"
+          )"
+          if [ "$match_count" -lt 1 ]; then
+            echo "Commit ${COMMIT_SHA} is not the merge commit of a merged release or hotfix PR for version ${VERSION}." >&2
+            exit 1
+          fi
 
       - name: Validate foundation version metadata
         run: bash scripts/foundation/check_version.sh "${{ steps.version.outputs.value }}"
@@ -122,15 +148,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
-          gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --json isDraft,isPrerelease,assets \
-            --jq '
-              if .isDraft then error("release is still a draft") else . end
-              | if .isPrerelease then error("foundation release was marked prerelease") else . end
-              | if ([.assets[] | select(.name == "dist-foundation-release.json" and .size > 0)] | length) != 1 then error("missing foundation metadata asset") else . end
-              | if ([.assets[] | select(.name == "dist-foundation-release.sbom.cdx.json" and .size > 0)] | length) != 1 then error("missing foundation SBOM asset") else . end
-              | if ([.assets[] | select(.name == "dist-foundation-release.json.sigstore.json" and .size > 0)] | length) != 1 then error("missing foundation Sigstore asset") else "verified" end
-            '
+          bash scripts/release/verify_github_release_assets.sh \
+            "$VERSION" \
+            false \
+            dist-foundation-release.json \
+            dist-foundation-release.sbom.cdx.json \
+            dist-foundation-release.json.sigstore.json
 
       - name: Attest foundation release metadata
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32

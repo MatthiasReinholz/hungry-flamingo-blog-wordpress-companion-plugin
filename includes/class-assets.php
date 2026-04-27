@@ -16,6 +16,7 @@ final class Assets {
 	private static $localized_post_id = 0;
 
 	public function register(): void {
+		add_action( 'init', [ $this, 'register_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'maybe_enqueue_continuous_reading' ], 20 );
 	}
@@ -43,7 +44,7 @@ final class Assets {
 			return;
 		}
 
-		wp_enqueue_style( 'hfb-companion-continuous-reading' );
+		self::enqueue_block_styles();
 		wp_enqueue_script( 'hfb-companion-continuous-reading' );
 
 		if ( self::$localized_post_id === $post_id ) {
@@ -65,6 +66,10 @@ final class Assets {
 		);
 
 		self::$localized_post_id = $post_id;
+	}
+
+	public static function enqueue_block_styles(): void {
+		wp_enqueue_style( 'hfb-companion-continuous-reading' );
 	}
 
 	public function maybe_enqueue_continuous_reading(): void {

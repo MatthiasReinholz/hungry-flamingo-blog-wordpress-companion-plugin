@@ -21,9 +21,11 @@ declare( strict_types=1 );
 defined( 'ABSPATH' ) || exit;
 
 define( 'HFB_COMPANION_VERSION', '1.0.0' );
-define( 'HFB_COMPANION_DIR', trailingslashit( plugin_dir_path( __FILE__ ) ) );
-define( 'HFB_COMPANION_URL', trailingslashit( plugin_dir_url( __FILE__ ) ) );
+define( 'HFB_COMPANION_DIR', __DIR__ . '/' );
+$hfb_companion_plugin_url = function_exists( 'plugin_dir_url' ) ? rtrim( plugin_dir_url( __FILE__ ), '/' ) . '/' : '';
+define( 'HFB_COMPANION_URL', $hfb_companion_plugin_url );
 define( 'HFB_COMPANION_STACK_SIZE', 5 );
+unset( $hfb_companion_plugin_url );
 
 if ( ! defined( 'HFB_COMPANION_TEXT_DOMAIN' ) ) {
 	define( 'HFB_COMPANION_TEXT_DOMAIN', 'hungry-flamingo-blog-companion' );
@@ -54,9 +56,11 @@ spl_autoload_register(
 	}
 );
 
-add_action(
-	'plugins_loaded',
-	static function (): void {
-		( new HFB_Companion\Plugin() )->boot();
-	}
-);
+if ( function_exists( 'add_action' ) ) {
+	add_action(
+		'plugins_loaded',
+		static function (): void {
+			( new HFB_Companion\Plugin() )->boot();
+		}
+	);
+}

@@ -20,7 +20,7 @@ The plugin intentionally does not alter WooCommerce products, carts, checkout, o
 
 == Installation ==
 
-1. Upload the plugin directory to `wp-content/plugins/`.
+1. Upload the installable release ZIP or extracted release directory to WordPress.
 2. Activate Hungry Flamingo Blog Companion in Plugins.
 3. Visit a single post. The plugin appends a continuous-reading stack after the post content.
 4. Optional: insert the Related Posts or Reader CTA blocks in post templates or individual posts.

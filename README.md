@@ -18,7 +18,7 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 
 ## Development
 
-This repository is managed with `wp-plugin-base` v1.7.9.
+This repository is managed with `wp-plugin-base` v1.7.10.
 
 ```sh
 bash .wp-plugin-base/scripts/update/sync_child_repo.sh
@@ -37,6 +37,8 @@ bash .wp-plugin-base/scripts/ci/build_zip.sh
 Stable releases should use the managed `prepare-release` and `finalize-release` workflows from `wp-plugin-base`. Beta releases can use prerelease semver tags such as `v1.0.0-beta.1`; the `publish-tag-release` workflow creates or repairs the GitHub prerelease and attaches the installable ZIP, SBOM, and Sigstore bundle so prerelease tags do not remain tag-only. Stable `x.y.z` tags are published by the release PR/finalize flow, not by tag push.
 
 Prerelease tags package the matching stable WordPress metadata version. For example, `v1.0.0-beta.1` installs as plugin version `1.0.0` while GitHub marks the artifact as a prerelease for tester distribution.
+
+Install the verified release ZIP or the extracted release directory in WordPress. The source repository root contains development tooling and foundation metadata and should not be installed directly on production sites.
 
 ## Privacy and Data Exposure
 

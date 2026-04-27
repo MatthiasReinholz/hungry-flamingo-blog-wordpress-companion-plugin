@@ -33,7 +33,7 @@ Hotfixes use the same model from `hotfix/x.y.z` branches.
 
 ## CI And Release Automation
 
-This project uses local managed workflow files generated from `wp-plugin-base` version `v1.7.9`.
+This project uses local managed workflow files generated from `wp-plugin-base` version `v1.7.10`.
 
 If you use a coding agent in this repository, treat `.wp-plugin-base/` as authoritative infrastructure code and avoid hand-editing generated managed files directly. Make behavior changes in the vendored foundation source/templates, then rerun sync.
 
@@ -66,10 +66,10 @@ When `WORDPRESS_SECURITY_PACK_ENABLED=true`, readiness validation also runs a fo
 - explicit `WordPress.Security` sniffs for escaping, nonce verification, and sanitized input
 - explicit `WordPress.DB` sniffs for direct queries and prepared SQL
 - explicit `WordPress.WP.Capabilities` checks
-- a narrow REST authorization pattern scan that fails on `permission_callback => __return_true`
+- a REST authorization pattern scan that fails on missing or always-public REST permission callbacks unless explicitly justified
 - dependency audits for root `composer.lock` and runtime `package-lock.json` files when present
 
-If `PHP_RUNTIME_MATRIX` is set, CI also runs a lightweight runtime smoke job across the listed PHP versions. That job reruns repository validation and WordPress metadata checks with each interpreter version so syntax- and interpreter-level issues surface before release. Set `PHP_RUNTIME_MATRIX_MODE=strict` to additionally run PHPUnit in the matrix when `phpunit.xml.dist` and the managed quality-pack tool bundle are present, including bridge-only mode when `WORDPRESS_QUALITY_PACK_ENABLED=false`.
+If `PHP_RUNTIME_MATRIX` is set, CI also runs a lightweight runtime smoke job across the listed PHP versions. That job reruns repository validation, WordPress metadata checks, and a direct main-plugin load smoke with each interpreter version so syntax-, include-, and interpreter-level issues surface before release. Set `PHP_RUNTIME_MATRIX_MODE=strict` to additionally run PHPUnit in the matrix when `phpunit.xml.dist` and the managed quality-pack tool bundle are present, including bridge-only mode when `WORDPRESS_QUALITY_PACK_ENABLED=false`.
 
 When that PHPUnit bridge path is enabled, `tests/bootstrap.php` is managed by foundation sync. Keep child-specific PHPUnit preloads and support-class requires in `tests/wp-plugin-base/bootstrap-child.php`, which is seeded as child-owned.
 
