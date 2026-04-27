@@ -19,7 +19,7 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 
 ## Development
 
-This repository is managed with `wp-plugin-base` v1.7.10.
+This repository is managed with `wp-plugin-base` v1.7.11.
 
 ```sh
 bash .wp-plugin-base/scripts/update/sync_child_repo.sh
@@ -29,7 +29,7 @@ bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh
 
 Readiness validation includes the managed WordPress quality pack: PHP syntax, PHPCS/WPCS, PHPStan, PHPUnit bootstrap tests, Plugin Check, the security pack, and strict PHP runtime smoke checks across PHP 8.2, 8.3, and 8.4.
 
-If a local PHP CLI is capped at `128M`, run readiness with a temporary PHP config that raises `memory_limit`; PHPStan's WordPress stubs can exceed 128 MB even for this small plugin.
+This project sets `PHPSTAN_MEMORY_LIMIT=1G` in `.wp-plugin-base.env` because PHPStan's WordPress stubs can exceed a local PHP CLI's default `128M` memory cap even for this small plugin.
 
 ## Release
 
