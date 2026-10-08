@@ -62,6 +62,8 @@ for literal in \
   'install_release_security_tools.sh' \
   'verify_foundation_release.sh' \
   'sync_child_repo.sh' \
+  'WP_PLUGIN_BASE_ACTION_MIGRATION_MANIFEST' \
+  'list_migrated_action_paths.rb' \
   'validate_project.sh' \
   'create_or_update_pr.sh'
 do
@@ -81,5 +83,95 @@ for literal in \
 do
   assert_same_literal_presence "$literal" "$root_finalize" "$child_finalize" 'finalize-release logic'
 done
+
+for file in "$root_finalize" "$child_finalize" \
+  "$ROOT_DIR/.github/workflows/finalize-foundation-release.yml" \
+  "$ROOT_DIR/.github/workflows/release-foundation.yml" \
+  "$ROOT_DIR/.github/workflows/release.yml" \
+  "$ROOT_DIR/templates/child/.github/workflows/release.yml" \
+  "$ROOT_DIR/templates/child/.github/workflows/publish-tag-release.yml"; do
+  # GitHub expressions must remain literal in policy checks.
+  # shellcheck disable=SC2016
+  assert_contains_literal 'group: release-publication-${{ github.repository }}' "$file" 'Shared publication concurrency'
+done
+
+# Ruby compares authored GitHub expressions, not shell substitutions.
+# shellcheck disable=SC2016
+ruby -ryaml -e '
+  root = File.expand_path("../..", File.dirname(ARGV.first))
+  publishing = Dir.glob(["#{root}/.github/workflows/*.yml", "#{root}/templates/child/.github/workflows/*.yml"]).select do |file|
+    YAML.load_file(file).fetch("jobs", {}).values.any? do |job|
+      job.fetch("steps", []).any? { |step| step["run"].to_s.match?(/publish_github_release\.sh|gh release (?:create|edit|upload)/) }
+    end
+  end
+  abort "Publishing workflows missing policy coverage: #{publishing - ARGV}" unless (publishing - ARGV).empty?
+  ARGV.each do |file|
+    doc = YAML.load_file(file)
+    job = doc.fetch("jobs").fetch("release")
+    steps = job.fetch("steps")
+    publish = steps.index { |step| step["run"].to_s.include?("publish_github_release.sh") }
+    abort "Inline publication bypasses immutable payload checks: #{file}" unless publish
+    if File.basename(file) != "publish-tag-release.yml"
+      verify = steps.index { |step| step["name"] == "Verify signing identity before publication" }
+      abort "Signing identity is not checked before publication: #{file}" unless verify && verify < publish
+    end
+    steps.each_with_index do |step, index|
+      next unless step["run"].to_s.match?(/\/(?:deploy_wordpress_org|deploy_woocommerce_com)\.sh/)
+      abort "Channel deploy precedes immutable host publication: #{file}" unless index > publish
+    end
+    foundation = File.basename(file).include?("foundation")
+    child = file.include?("/templates/child/")
+    unless foundation
+      capture = steps.index { |step| step["name"] == "Capture verified package generation" }
+      context = steps.index { |step| step["run"].to_s.include?("check_release_context.sh") }
+      abort "Release lacks a checked profile/branch context before capture: #{file}" unless context && capture && context < capture && capture < publish
+      abort "Trusted package helpers lack their templates: #{file}" unless steps.any? { |step| step["run"].to_s.include?("/templates ") }
+      steps.each do |step|
+        run = step["run"].to_s
+        if run.match?(/(?:generate_sbom|sign_release|publish_github_release|deploy_wordpress_org|deploy_woocommerce_com)\.sh/)
+          abort "Release consumer reads a mutable compatibility package: #{file}" if run.include?("dist/package/") || run.include?("dist/${")
+        end
+        if step["uses"].to_s.match?(/actions\/(?:upload-artifact|attest-build-provenance)@/)
+          key = step["uses"].include?("upload-artifact") ? "path" : "subject-path"
+          abort "Release uploads an uncaptured package: #{file}" unless step.fetch("with")[key] == "${{ steps.package.outputs.zip_path }}"
+        end
+      end
+    end
+    branch = foundation ? "main" : (child ? "__DEFAULT_BRANCH__" : "${{ github.event.repository.default_branch }}")
+    if ["release.yml", "release-foundation.yml"].include?(File.basename(file))
+      expected_if = if !foundation && !child
+        "${{ github.ref == format(\x27refs/heads/{0}\x27, github.event.repository.default_branch) }}"
+      else
+        "${{ github.ref == \x27refs/heads/#{branch}\x27 }}"
+      end
+      abort "Manual stable signing is not bound to the default branch: #{file}" unless job["if"] == expected_if
+    end
+    if File.basename(file) == "release.yml"
+      restore = steps.find { |step| step["run"].to_s.include?("restore_github_release_assets.sh") }
+      abort "Default recovery does not restore verified bytes: #{file}" unless restore && restore["if"] == "${{ !inputs.repair_host_assets }}"
+      abort "Host repair is not explicit: #{file}" unless steps[publish]["if"] == "${{ inputs.repair_host_assets }}"
+    end
+    steps.select { |step| step["uses"].to_s.start_with?("actions/checkout@") }.each do |step|
+      abort "Checkout persists release credentials: #{file}" unless step.fetch("with")["persist-credentials"] == false
+    end
+    if File.basename(file).start_with?("finalize-")
+      preserve = steps.index { |step| step["name"] == "Preserve current trusted release helpers" }
+      detach = steps.index { |step| step["run"].to_s.include?("git checkout --detach") }
+      abort "Historical checkout bypasses current release policy: #{file}" unless preserve && detach && preserve < detach
+    else
+      trusted = steps.find { |step| step["name"] == "Checkout current trusted release helpers" }
+      abort "Recovery lacks protected default-branch helpers: #{file}" unless trusted && trusted.fetch("with")["ref"] == branch
+    end
+    steps.each do |step|
+      next unless step["run"].to_s.include?("publish_github_release.sh") || step["run"].to_s.include?("restore_github_release_assets.sh")
+      abort "Release used historical policy helper: #{file}" unless step["run"].include?("$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/")
+    end
+  end
+' "$root_finalize" "$child_finalize" \
+  "$ROOT_DIR/.github/workflows/finalize-foundation-release.yml" \
+  "$ROOT_DIR/.github/workflows/release-foundation.yml" \
+  "$ROOT_DIR/.github/workflows/release.yml" \
+  "$ROOT_DIR/templates/child/.github/workflows/release.yml" \
+  "$ROOT_DIR/templates/child/.github/workflows/publish-tag-release.yml"
 
 echo "Workflow parity tests passed for reusable and child-managed release/update workflows."

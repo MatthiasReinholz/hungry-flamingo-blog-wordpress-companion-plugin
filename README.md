@@ -66,3 +66,19 @@ See [docs/rest-contract.md](docs/rest-contract.md) for request parameters, respo
 ## License
 
 GNU General Public License v3. See [LICENSE](LICENSE).
+
+## Foundation maintenance
+
+The complete vendored foundation is imported from signed release `v1.10.2`,
+commit `6c342a8f634c6a480ee78f6303118cea18b2356d`, through the trusted verified
+manual importer. Historical generated workflows were compared against their
+committed templates before explicit ownership reconciliation and regeneration.
+The resulting `.wp-plugin-base-automation.json` records managed file hashes;
+custom application source remains outside managed ownership.
+
+Scheduled foundation updates require a repository-scoped automation credential
+in `WP_PLUGIN_BASE_PR_TOKEN` with contents, pull-request and workflow write
+permissions. The normal `GITHUB_TOKEN` cannot publish workflow changes. Configure
+the secret through GitHub administration, then re-enable and run the scheduled
+updater. Manual source adoption does not repair missing credential permissions.
+Never store credentials in source or Git remotes.

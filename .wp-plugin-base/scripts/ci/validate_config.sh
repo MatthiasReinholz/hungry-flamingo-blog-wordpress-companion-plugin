@@ -7,6 +7,8 @@ FOUNDATION_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CONFIG_SCHEMA_PATH="$FOUNDATION_DIR/docs/config-schema.json"
 # shellcheck source=../lib/load_config.sh
 . "$SCRIPT_DIR/../lib/load_config.sh"
+# shellcheck source=../lib/build_outputs.sh
+. "$SCRIPT_DIR/../lib/build_outputs.sh"
 
 CONFIG_SCOPE="project"
 CONFIG_OVERRIDE=""
@@ -293,6 +295,14 @@ validate_regex "$FOUNDATION_RELEASE_SOURCE_PROVIDER" '^(github-release|gitlab-re
 validate_regex "$FOUNDATION_RELEASE_SOURCE_REFERENCE" '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+$' 'FOUNDATION_RELEASE_SOURCE_REFERENCE'
 validate_trusted_git_url "$FOUNDATION_RELEASE_SOURCE_API_BASE" 'FOUNDATION_RELEASE_SOURCE_API_BASE'
 validate_regex "$FOUNDATION_VERSION" '^v[0-9]+\.[0-9]+\.[0-9]+$' 'FOUNDATION_VERSION'
+validate_regex "$AUTOMATION_PROFILE" '^(managed|local)$' 'AUTOMATION_PROFILE'
+if ! wp_plugin_base_valid_branch "$DEFAULT_BRANCH"; then
+  echo "DEFAULT_BRANCH must be a supported Git branch name: $DEFAULT_BRANCH" >&2
+  exit 1
+fi
+if [[ "$CONFIG_SCOPE" =~ ^(release|deploy-structure|deploy)$ ]]; then
+  wp_plugin_base_require_managed_automation "${CONFIG_SCOPE} validation"
+fi
 validate_regex "$PRODUCTION_ENVIRONMENT" '^[A-Za-z0-9_.-]+$' 'PRODUCTION_ENVIRONMENT'
 if [ -n "${FOUNDATION_RELEASE_SOURCE_SIGSTORE_ISSUER:-}" ]; then
   validate_trusted_git_url "$FOUNDATION_RELEASE_SOURCE_SIGSTORE_ISSUER" 'FOUNDATION_RELEASE_SOURCE_SIGSTORE_ISSUER'
@@ -336,8 +346,10 @@ if [[ "$CONFIG_SCOPE" =~ ^(project|ci|readiness|release|deploy-structure|deploy)
   validate_distignore_path "$DISTIGNORE_FILE"
 
   if [ -n "${PACKAGE_INCLUDE:-}" ]; then
-    validate_repo_relative_paths "$PACKAGE_INCLUDE" "PACKAGE_INCLUDE" true
+    validate_repo_relative_paths "$PACKAGE_INCLUDE" "PACKAGE_INCLUDE"
   fi
+
+  wp_plugin_base_validate_build_inputs
 
   validate_repo_relative_paths "$WP_PLUGIN_BASE_SECURITY_SUPPRESSIONS_FILE" "WP_PLUGIN_BASE_SECURITY_SUPPRESSIONS_FILE"
 
@@ -356,6 +368,10 @@ if [[ "$CONFIG_SCOPE" =~ ^(project|ci|readiness|release|deploy-structure|deploy)
   if [ -n "${EXTRA_ALLOWED_HOSTS:-}" ]; then
     while IFS= read -r host; do
       validate_regex "$host" '^[A-Za-z0-9.-]+$' 'EXTRA_ALLOWED_HOSTS host'
+      if wp_plugin_base_host_is_local_or_private "$host"; then
+        echo "EXTRA_ALLOWED_HOSTS host must not use localhost, private-network, link-local, or *.internal hosts: ${host}" >&2
+        exit 1
+      fi
     done < <(wp_plugin_base_csv_to_lines "$EXTRA_ALLOWED_HOSTS")
   fi
 
@@ -366,15 +382,22 @@ if [[ "$CONFIG_SCOPE" =~ ^(project|ci|readiness|release|deploy-structure|deploy)
     done < <(wp_plugin_base_csv_to_lines "$TRUSTED_GIT_HOSTS")
   fi
 
+  php "$SCRIPT_DIR/../lib/wordpress_test_plugins.php" "$WORDPRESS_TEST_PLUGINS" >/dev/null
   validate_regex "$WORDPRESS_READINESS_ENABLED" '^(true|false)$' 'WORDPRESS_READINESS_ENABLED'
   validate_regex "$WORDPRESS_QUALITY_PACK_ENABLED" '^(true|false)$' 'WORDPRESS_QUALITY_PACK_ENABLED'
+  validate_regex "$GITHUB_CODE_SCANNING_UPLOAD_ENABLED" '^(true|false)$' 'GITHUB_CODE_SCANNING_UPLOAD_ENABLED'
   validate_regex "$WORDPRESS_SECURITY_PACK_ENABLED" '^(true|false)$' 'WORDPRESS_SECURITY_PACK_ENABLED'
   validate_regex "$RELEASE_READINESS_MODE" '^(standard|security-sensitive)$' 'RELEASE_READINESS_MODE'
   validate_regex "$WOOCOMMERCE_QIT_ENABLED" '^(true|false)$' 'WOOCOMMERCE_QIT_ENABLED'
+  if [ "$AUTOMATION_PROVIDER" = gitlab ] && wp_plugin_base_is_true "$WOOCOMMERCE_QIT_ENABLED"; then
+    echo "WOOCOMMERCE_QIT_ENABLED is a GitHub-only workflow pack; configure project-owned QIT automation for GitLab." >&2
+    exit 1
+  fi
   validate_regex "${WOOCOMMERCE_COM_PRODUCT_ID:-}" '^$|^[0-9]+$' 'WOOCOMMERCE_COM_PRODUCT_ID'
   validate_regex "${WOOCOMMERCE_COM_ENDPOINT_TIMEOUT_SECONDS:-30}" '^[1-9][0-9]*$' 'WOOCOMMERCE_COM_ENDPOINT_TIMEOUT_SECONDS'
   validate_regex "${PLUGIN_RUNTIME_UPDATE_PROVIDER:-none}" '^(none|github-release|gitlab-release|generic-json)$' 'PLUGIN_RUNTIME_UPDATE_PROVIDER'
   validate_regex "${GITHUB_RELEASE_UPDATER_ENABLED:-false}" '^(true|false)$' 'GITHUB_RELEASE_UPDATER_ENABLED'
+  validate_regex "${RUNTIME_CLASS_PREFIX:-}" '^$|^[A-Za-z][A-Za-z0-9_]{0,62}_$' 'RUNTIME_CLASS_PREFIX'
   validate_regex "${REST_OPERATIONS_PACK_ENABLED:-false}" '^(true|false)$' 'REST_OPERATIONS_PACK_ENABLED'
   validate_regex "${REST_API_NAMESPACE:-}" '^$|^[a-z0-9][a-z0-9-]*/v[0-9]+$' 'REST_API_NAMESPACE'
   validate_regex "${REST_ABILITIES_ENABLED:-false}" '^(true|false)$' 'REST_ABILITIES_ENABLED'
@@ -382,6 +405,33 @@ if [[ "$CONFIG_SCOPE" =~ ^(project|ci|readiness|release|deploy-structure|deploy)
   validate_regex "${ADMIN_UI_STARTER:-}" '^$|^(basic|dataviews)$' 'ADMIN_UI_STARTER'
   validate_regex "${ADMIN_UI_EXPERIMENTAL_DATAVIEWS:-false}" '^(true|false)$' 'ADMIN_UI_EXPERIMENTAL_DATAVIEWS'
   validate_regex "${ADMIN_UI_NPM_AUDIT_LEVEL:-high}" '^(high|critical)$' 'ADMIN_UI_NPM_AUDIT_LEVEL'
+  validate_regex "$DEPENDABOT_ECOSYSTEMS" '^(auto|github-actions|composer|npm|admin-ui-npm)(,(github-actions|composer|npm|admin-ui-npm))*$' 'DEPENDABOT_ECOSYSTEMS'
+  seen_dependabot_values=,
+  while IFS= read -r ecosystem; do
+    if [[ "$seen_dependabot_values" == *",$ecosystem,"* ]]; then
+      echo "DEPENDABOT_ECOSYSTEMS contains a duplicate value: $ecosystem" >&2
+      exit 1
+    fi
+    seen_dependabot_values="$seen_dependabot_values$ecosystem,"
+    if [[ "$DEPENDABOT_ECOSYSTEMS" == auto,* ]]; then
+      echo "DEPENDABOT_ECOSYSTEMS auto must be used alone." >&2
+      exit 1
+    fi
+    if [ "$AUTOMATION_PROVIDER" = github ]; then
+      case "$ecosystem" in
+        composer|npm)
+          manifest=composer.json
+          if [ "$ecosystem" = npm ]; then manifest=package.json; fi
+          validate_file "$manifest" "DEPENDABOT_ECOSYSTEMS $ecosystem manifest"
+          ;;
+        admin-ui-npm)
+          if ! wp_plugin_base_is_true "$ADMIN_UI_PACK_ENABLED"; then
+            validate_file '.wp-plugin-base-admin-ui/package.json' 'DEPENDABOT_ECOSYSTEMS admin-ui-npm manifest'
+          fi
+          ;;
+      esac
+    fi
+  done < <(wp_plugin_base_csv_to_lines "$DEPENDABOT_ECOSYSTEMS")
   if [ -n "${GITHUB_RELEASE_UPDATER_REPO_URL:-}" ]; then
     validate_public_https_url "$GITHUB_RELEASE_UPDATER_REPO_URL" 'GITHUB_RELEASE_UPDATER_REPO_URL'
     if [[ "$GITHUB_RELEASE_UPDATER_REPO_URL" != https://github.com/* ]]; then

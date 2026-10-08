@@ -4,6 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="${1:?Usage: $0 <root-dir>}"
 
+python3 "$ROOT_DIR/scripts/foundation/test_wordpress_org_deploy.py"
+
 audit_fixture=""
 zip_fixture=""
 forbidden_fixture=""
@@ -507,6 +509,27 @@ fi
 
 rm -rf "$audit_fixture"
 audit_fixture="$(mktemp -d)"
+mkdir -p "$audit_fixture/templates/child/qit-pack/.github/workflows"
+
+cat > "$audit_fixture/templates/child/qit-pack/.github/workflows/woocommerce-qit.yml" <<'EOF'
+name: woocommerce-qit
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  qit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+EOF
+
+if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
+  echo "Audit unexpectedly passed for an unpinned nested managed workflow action." >&2
+  exit 1
+fi
+
+rm -rf "$audit_fixture"
+audit_fixture="$(mktemp -d)"
 mkdir -p "$audit_fixture/.github/workflows"
 
 cat > "$audit_fixture/.github/workflows/ci.yml" <<'EOF'
@@ -565,7 +588,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -588,7 +611,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -611,7 +634,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -638,7 +661,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -671,7 +694,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -693,7 +716,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -715,7 +738,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -737,7 +760,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -760,7 +783,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -931,7 +954,7 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if ! bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -951,7 +974,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: |
           curl -fsSL https://github.com/example/install.sh -o /tmp/install.sh
           bash /tmp/install.sh
@@ -975,7 +998,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: bash scripts/test.sh
 EOF
 
@@ -1005,7 +1028,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 dynamic_scheme='https'
@@ -1038,7 +1061,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 EOF
 
 if bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
@@ -1064,7 +1087,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: echo "$extra_url"
 EOF
 
@@ -1075,6 +1098,16 @@ fi
 
 if ! EXTRA_ALLOWED_HOSTS='raw.githubusercontent.com' bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture"; then
   echo "Audit unexpectedly failed when EXTRA_ALLOWED_HOSTS included the host." >&2
+  exit 1
+fi
+
+if EXTRA_ALLOWED_HOSTS='raw.githubusercontent.com,localhost' bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture" >/dev/null 2>&1; then
+  echo "Audit unexpectedly passed when EXTRA_ALLOWED_HOSTS included localhost." >&2
+  exit 1
+fi
+
+if EXTRA_ALLOWED_HOSTS='10.0.0.5,raw.githubusercontent.com' bash "$ROOT_DIR/scripts/ci/audit_workflows.sh" "$audit_fixture" >/dev/null 2>&1; then
+  echo "Audit unexpectedly passed when EXTRA_ALLOWED_HOSTS included a private-network host." >&2
   exit 1
 fi
 
@@ -1759,6 +1792,11 @@ cat > "$release_publish_fixture/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 log_file="${RELEASE_PUBLISH_LOG:?}"
 printf '%s\n' "$*" >> "$log_file"
+if [ "$1" = "api" ]; then
+  if [ "${RELEASE_LIST_SHOULD_FAIL:-false}" = true ]; then exit 1; fi
+  printf '%s\n' "${RELEASE_PUBLISHED_TAGS:-}"
+  exit 0
+fi
 if [ "$1" = "release" ] && [ "$2" = "view" ]; then
   if [ "${RELEASE_ALREADY_EXISTS:-false}" = "true" ]; then
     exit 0
@@ -1826,7 +1864,10 @@ fi
 grep -Fq 'release edit v1.2.3' "$release_publish_output"
 grep -Fq 'release upload v1.2.3' "$release_publish_output"
 grep -Fq -- '--draft=false' "$release_publish_output"
-grep -Fq -- '--latest=false' "$release_publish_output"
+if grep -Fq -- '--latest' "$release_publish_output"; then
+  echo "Evidence repair unexpectedly changed the latest designation." >&2
+  exit 1
+fi
 upload_line="$(grep -nF 'release upload v1.2.3' "$release_publish_output" | head -n 1 | cut -d: -f1)"
 edit_line="$(grep -nF 'release edit v1.2.3' "$release_publish_output" | head -n 1 | cut -d: -f1)"
 if [ "$upload_line" -ge "$edit_line" ]; then
@@ -1877,6 +1918,24 @@ if (
 fi
 if grep -Fq 'release edit v1.2.3' "$release_publish_output"; then
   echo "Release repair edited release metadata after asset replacement failed." >&2
+  exit 1
+fi
+
+: > "$release_publish_output"
+PATH="$release_publish_fixture/bin:$PATH" GITHUB_REPOSITORY=example/repo \
+  RELEASE_PUBLISH_LOG="$release_publish_output" RELEASE_ALREADY_EXISTS=true \
+  RELEASE_PUBLISHED_TAGS=$'v1.2.3\nv1.10.0\nv1.9.0' \
+  bash "$ROOT_DIR/scripts/release/publish_github_release.sh" --repair --mark-latest \
+    v1.2.3 'Release v1.2.3' "$release_publish_fixture/notes.md" "$release_publish_fixture/asset.txt"
+if grep -Fq -- '--latest' "$release_publish_output"; then
+  echo "Historical repair unexpectedly changed the latest designation." >&2
+  exit 1
+fi
+if PATH="$release_publish_fixture/bin:$PATH" GITHUB_REPOSITORY=example/repo \
+  RELEASE_PUBLISH_LOG="$release_publish_output" RELEASE_LIST_SHOULD_FAIL=true \
+  bash "$ROOT_DIR/scripts/release/publish_github_release.sh" --mark-latest \
+    v1.2.3 'Release v1.2.3' "$release_publish_fixture/notes.md"; then
+  echo "Release publication accepted an unknown latest state after API failure." >&2
   exit 1
 fi
 
@@ -1975,8 +2034,13 @@ fi
 wordpress_org_deploy_fixture="$(mktemp -d)"
 cp -R "$ROOT_DIR/tests/fixtures/standard-plugin/." "$wordpress_org_deploy_fixture/"
 mkdir -p "$wordpress_org_deploy_fixture/bin"
+WPORG_REAL_GIT="$(command -v git)"
+export WPORG_REAL_GIT
 cat > "$wordpress_org_deploy_fixture/bin/git" <<'EOF'
 #!/usr/bin/env bash
+if [ "$1" = check-ref-format ] && [ "$2" = --branch ]; then
+  exec "$WPORG_REAL_GIT" "$@"
+fi
 if [ "$1" = "-C" ] && [ "$3" = "tag" ] && [ "$4" = "--list" ]; then
   printf '%s\n' "${WPORG_LATEST_REPO_VERSION:-1.2.3}"
   exit 0
@@ -1986,6 +2050,9 @@ exit 1
 EOF
 cat > "$wordpress_org_deploy_fixture/bin/python3" <<'EOF'
 #!/usr/bin/env bash
+if [[ "$1" = */compare_package_trees.py ]] && [ "${WPORG_TAG_DIFFERS:-false}" = "true" ]; then
+  exit 1
+fi
 exit 0
 EOF
 cat > "$wordpress_org_deploy_fixture/bin/svn" <<'EOF'
@@ -1997,12 +2064,15 @@ case "$1" in
     exit 0
     ;;
   update)
+    target_dir="${@: -1}"
+    target_dir="${target_dir%/assets}"
+    mkdir -p "$target_dir/trunk" "$target_dir/tags" "$target_dir/assets"
     if [ "$SVN_TAG_EXISTS" = "true" ]; then
-      target_dir="${@: -1}"
       mkdir -p "$target_dir/tags/${WPORG_VERSION}"
     fi
-    target_dir="${@: -1}"
-    mkdir -p "$target_dir/trunk" "$target_dir/tags" "$target_dir/assets"
+    if [ -n "${WPORG_NEWER_SVN_VERSION:-}" ]; then
+      mkdir -p "$target_dir/tags/$WPORG_NEWER_SVN_VERSION"
+    fi
     exit 0
     ;;
   info)
@@ -2023,10 +2093,6 @@ exit 1
 EOF
 cat > "$wordpress_org_deploy_fixture/bin/rsync" <<'EOF'
 #!/usr/bin/env bash
-destination="${@: -1}"
-if [[ " $* " == *" -ani "* ]] && [ "${WPORG_TAG_DIFFERS:-false}" = "true" ] && [[ "$destination" = */tags/${WPORG_VERSION}/ ]]; then
-  printf '%s\n' 'deleting stale-file.php'
-fi
 exit 0
 EOF
 chmod +x "$wordpress_org_deploy_fixture/bin/git" "$wordpress_org_deploy_fixture/bin/python3" "$wordpress_org_deploy_fixture/bin/svn" "$wordpress_org_deploy_fixture/bin/rsync"
@@ -2073,6 +2139,21 @@ fi
     WP_PLUGIN_BASE_ALLOW_WPORG_TAG_REDEPLOY=true \
     bash "$ROOT_DIR/scripts/release/deploy_wordpress_org.sh" "1.2.3" ".wp-plugin-base.env" "$wordpress_org_deploy_fixture"
 )
+
+for tag_exists in true false; do
+  for newer_source in repository svn; do
+    if PATH="$wordpress_org_deploy_fixture/bin:$PATH" \
+      WP_PLUGIN_BASE_ROOT="$wordpress_org_deploy_fixture" \
+      SVN_USERNAME=fixture-user SVN_PASSWORD=fixture-pass \
+      SVN_TAG_EXISTS="$tag_exists" WPORG_VERSION=1.2.3 \
+      WPORG_LATEST_REPO_VERSION="$([ "$newer_source" = repository ] && echo 1.3.0 || echo 1.2.3)" \
+      WPORG_NEWER_SVN_VERSION="$([ "$newer_source" = svn ] && echo 1.3.0 || echo '')" \
+      bash "$ROOT_DIR/scripts/release/deploy_wordpress_org.sh" 1.2.3 ".wp-plugin-base.env" "$wordpress_org_deploy_fixture"; then
+      echo "Ordinary replay overwrote trunk with a newer $newer_source release (existing tag: $tag_exists)." >&2
+      exit 1
+    fi
+  done
+done
 
 forbidden_fixture="$(mktemp -d)"
 cp -R "$ROOT_DIR/tests/fixtures/standard-plugin/." "$forbidden_fixture/"
@@ -2173,6 +2254,12 @@ if [[ "$args" == *"/deploy/status"* ]]; then
       ;;
     already_live)
       emit_response '{"status":"complete","version":"1.2.3"}'
+      ;;
+    failed_retry)
+      emit_response '{"status":"failed","version":"1.2.3"}'
+      ;;
+    unknown)
+      emit_response '{"status":"unexpected","version":"1.2.3"}'
       ;;
     higher_live)
       emit_response '{"status":"complete","version":"1.2.4"}'
@@ -2308,11 +2395,18 @@ if ! (
     WP_PLUGIN_BASE_ROOT="$woocommerce_deploy_fixture" \
     WOO_COM_USERNAME=fixture-user \
     WOO_COM_APP_PASSWORD=fixture-pass \
-    WOO_CURL_SHOULD_NOT_RUN=true \
+    WOO_CURL_SCENARIO=failed_retry \
     WP_PLUGIN_BASE_REPAIR_MODE=true \
     bash "$ROOT_DIR/scripts/release/deploy_woocommerce_com.sh" "1.2.3" ".wp-plugin-base.env" "dist/standard-plugin.zip" >/dev/null
 ); then
-  echo "WooCommerce.com deploy unexpectedly failed in repair-mode short-circuit." >&2
+  echo "WooCommerce.com deploy failed to retry a failed deployment in repair mode." >&2
+  exit 1
+fi
+
+if PATH="$woocommerce_deploy_fixture/bin:$PATH" WP_PLUGIN_BASE_ROOT="$woocommerce_deploy_fixture" \
+  WOO_COM_USERNAME=fixture-user WOO_COM_APP_PASSWORD=fixture-pass WOO_CURL_SCENARIO=unknown \
+  bash "$ROOT_DIR/scripts/release/deploy_woocommerce_com.sh" 1.2.3 ".wp-plugin-base.env" "$woocommerce_deploy_fixture/dist/standard-plugin.zip"; then
+  echo "WooCommerce deployment accepted an unknown state as completed." >&2
   exit 1
 fi
 

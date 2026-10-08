@@ -44,6 +44,10 @@ trap 'rm -rf "$full_fixture" "$bridge_fixture" "$mode_only_fixture"' EXIT
 WP_PLUGIN_BASE_ROOT="$full_fixture" bash "$ROOT_DIR/scripts/update/sync_child_repo.sh"
 
 assert_regular_file "$full_fixture/.phpcs.xml.dist" "Full quality pack should manage .phpcs.xml.dist."
+if ! grep -Fq '<exclude-pattern>*/assets/admin-ui/*.asset.php</exclude-pattern>' "$full_fixture/.phpcs.xml.dist"; then
+  echo "Generated admin dependency metadata must have a narrowly scoped coding-style exclusion." >&2
+  exit 1
+fi
 assert_regular_file "$full_fixture/phpstan.neon.dist" "Full quality pack should manage phpstan.neon.dist."
 assert_regular_file "$full_fixture/phpunit.xml.dist" "Full quality pack should manage phpunit.xml.dist."
 assert_regular_file "$full_fixture/phpstan.neon" "Full quality pack should seed phpstan.neon."
@@ -55,6 +59,11 @@ assert_regular_file "$full_fixture/.wp-plugin-base-quality-pack/composer.json" "
 
 grep -Fq "bootstrap-child.php" "$full_fixture/tests/bootstrap.php" || {
   echo "Managed quality-pack bootstrap should load the child-owned bootstrap overlay." >&2
+  exit 1
+}
+
+grep -Fq '<directory suffix="Test.php">tests</directory>' "$full_fixture/phpunit.xml.dist" || {
+  echo "Managed phpunit.xml.dist should discover foundation and child-owned *Test.php files under tests/." >&2
   exit 1
 }
 
@@ -133,6 +142,11 @@ assert_regular_file "$bridge_fixture/.wp-plugin-base-quality-pack/composer.lock"
 assert_not_present "$bridge_fixture/.phpcs.xml.dist" "Strict runtime matrix should not force PHPCS config without the full quality pack."
 assert_not_present "$bridge_fixture/phpstan.neon.dist" "Strict runtime matrix should not force PHPStan config without the full quality pack."
 assert_not_present "$bridge_fixture/phpstan.neon" "Strict runtime matrix should not seed phpstan.neon without the full quality pack."
+
+grep -Fq '<directory suffix="Test.php">tests</directory>' "$bridge_fixture/phpunit.xml.dist" || {
+  echo "Strict runtime matrix phpunit.xml.dist should discover child-owned tests/php/*Test.php files." >&2
+  exit 1
+}
 
 cat > "$bridge_fixture/tests/bootstrap.php" <<'EOF_CUSTOM_BOOTSTRAP'
 <?php

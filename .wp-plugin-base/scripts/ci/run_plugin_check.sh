@@ -15,8 +15,11 @@ CONFIG_OVERRIDE="${1:-}"
 wp_plugin_base_require_commands "Plugin Check" docker jq npm php zip unzip
 wp_plugin_base_load_config "$CONFIG_OVERRIDE"
 wp_plugin_base_require_vars PLUGIN_SLUG
+# Reject invalid dependency configuration before installing tools or starting Docker.
+php "$SCRIPT_DIR/../lib/wordpress_test_plugins.php" "$WORDPRESS_TEST_PLUGINS" >/dev/null
 
-PACKAGE_ROOT="$ROOT_DIR/dist/package/$PLUGIN_SLUG"
+PACKAGE_ROOT="${WP_PLUGIN_BASE_PACKAGE_DIR:-$ROOT_DIR/dist/package/$PLUGIN_SLUG}"
+wp_plugin_base_assert_path_within_root "$PACKAGE_ROOT" "Plugin Check package"
 REPORT_PATH="$ROOT_DIR/dist/plugin-check.json"
 
 if [ ! -d "$PACKAGE_ROOT" ]; then
@@ -45,11 +48,15 @@ elif command -v gtimeout >/dev/null 2>&1; then
   timeout_bin='gtimeout'
 fi
 
+wp_env_start_attempted=false
+
 cleanup() {
-  if [ -x "$wp_env_tools_dir/node_modules/.bin/wp-env" ]; then
-    WP_ENV_HOME="$wp_env_home" BUILDX_CONFIG="$buildx_config_dir" NPM_CONFIG_CACHE="$npm_cache_dir" wp_plugin_base_wordpress_env "$wp_env_tools_dir" stop --config="$wp_env_config" >/dev/null 2>&1 || true
+  local status="$?"
+  if ! wp_plugin_base_cleanup_temporary_wordpress_env "$wp_env_tools_dir" "$wp_env_home" "$wp_env_config" \
+    "$npm_cache_dir" "$buildx_config_dir" "$wp_env_start_attempted" "$wp_env_start_log"; then
+    if [ "$status" -eq 0 ]; then status=1; fi
   fi
-  rm -rf "$wp_env_home" "$wp_env_config" "$wp_env_tools_dir" "$npm_cache_dir" "$buildx_config_dir" "$wp_env_start_log"
+  exit "$status"
 }
 
 trap cleanup EXIT
@@ -64,21 +71,12 @@ while [ "$attempt" -le "$max_attempts" ]; do
   wp_env_port="$((20000 + (RANDOM % 10000)))"
   wp_env_tests_port="$((30000 + (RANDOM % 10000)))"
 
-  WP_PLUGIN_BASE_TARGET_ROOT="$ROOT_DIR" \
-  WP_PLUGIN_BASE_WP_ENV_PORT="$wp_env_port" \
-  WP_PLUGIN_BASE_WP_ENV_TESTS_PORT="$wp_env_tests_port" \
-  php -r '
-    $config = [
-      "plugins" => [getenv("WP_PLUGIN_BASE_TARGET_ROOT")],
-      "port" => (int) getenv("WP_PLUGIN_BASE_WP_ENV_PORT"),
-      "testsPort" => (int) getenv("WP_PLUGIN_BASE_WP_ENV_TESTS_PORT"),
-      "testsEnvironment" => false,
-    ];
-    file_put_contents($argv[1], json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-  ' "$wp_env_config"
+  php "$SCRIPT_DIR/../lib/wordpress_test_plugins.php" "$WORDPRESS_TEST_PLUGINS" \
+    "$ROOT_DIR" "$wp_env_port" "$wp_env_tests_port" > "$wp_env_config"
 
   : > "$wp_env_start_log"
 
+  wp_env_start_attempted=true
   if WP_ENV_HOME="$wp_env_home" BUILDX_CONFIG="$buildx_config_dir" NPM_CONFIG_CACHE="$npm_cache_dir" wp_plugin_base_wordpress_env "$wp_env_tools_dir" start --config="$wp_env_config" >/dev/null 2>"$wp_env_start_log"; then
     if WP_ENV_HOME="$wp_env_home" BUILDX_CONFIG="$buildx_config_dir" NPM_CONFIG_CACHE="$npm_cache_dir" wp_plugin_base_wordpress_env "$wp_env_tools_dir" run cli --config="$wp_env_config" -- wp plugin install plugin-check --version="$WP_PLUGIN_BASE_PLUGIN_CHECK_VERSION" --activate >/dev/null 2>&1; then
       if WP_ENV_HOME="$wp_env_home" BUILDX_CONFIG="$buildx_config_dir" NPM_CONFIG_CACHE="$npm_cache_dir" wp_plugin_base_wordpress_env "$wp_env_tools_dir" run cli --config="$wp_env_config" -- wp plugin is-installed plugin-check >/dev/null 2>&1; then
@@ -129,7 +127,7 @@ if [ "$plugin_check_cli_exists" != "1" ]; then
 fi
 
 repo_basename="$(basename "$ROOT_DIR")"
-plugin_path="/var/www/html/wp-content/plugins/${repo_basename}/dist/package/${PLUGIN_SLUG}"
+plugin_path="/var/www/html/wp-content/plugins/${repo_basename}/${PACKAGE_ROOT#"$ROOT_DIR"/}"
 wp_env_bin="$wp_env_tools_dir/node_modules/.bin/wp-env"
 plugin_check_args=(
   wp
@@ -137,6 +135,7 @@ plugin_check_args=(
   plugin check "$plugin_path"
   --slug="$PLUGIN_SLUG"
   --format=strict-json
+  '--fields=file,line,column,type,code,message,docs'
 )
 
 if [ -n "${WP_PLUGIN_BASE_PLUGIN_CHECK_CHECKS:-}" ]; then
@@ -221,12 +220,31 @@ warning_count="$(printf '%s\n' "$json_payload" | jq '[ .[] | select(.type == "WA
 
 printf 'Plugin Check: %s errors, %s warnings.\n' "$error_count" "$warning_count"
 
+print_plugin_check_findings() {
+  local finding_type="$1"
+  local finding_count="$2"
+  local limit="${3:-10}"
+
+  if [ "$finding_count" -le 0 ]; then
+    return
+  fi
+
+  printf 'Plugin Check %s details (showing up to %s):\n' "$finding_type" "$limit" >&2
+  printf '%s\n' "$json_payload" | bash "$SCRIPT_DIR/format_plugin_check_findings.sh" "$finding_type" "$limit" >&2
+
+  if [ "$finding_count" -gt "$limit" ]; then
+    printf 'Plugin Check %s details truncated: %s additional findings not shown.\n' "$finding_type" "$((finding_count - limit))" >&2
+  fi
+}
+
 if [ "$error_count" -gt 0 ]; then
+  print_plugin_check_findings "ERROR" "$error_count"
   echo "Plugin Check reported errors. See dist/plugin-check.json." >&2
   exit 1
 fi
 
 if wp_plugin_base_is_true "${WP_PLUGIN_BASE_PLUGIN_CHECK_STRICT_WARNINGS:-false}" && [ "$warning_count" -gt 0 ]; then
+  print_plugin_check_findings "WARNING" "$warning_count"
   echo "Plugin Check reported warnings and strict warnings mode is enabled. See dist/plugin-check.json." >&2
   exit 1
 fi

@@ -7,12 +7,14 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  WP_PLUGIN_BASE_CONFIG: '.wp-plugin-base.env'
+  RELEASE_WORKFLOW_BRANCH: 'main'
 
 permissions:
   contents: read
 
 concurrency:
-  group: finalize-release-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  group: release-publication-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -30,7 +32,7 @@ jobs:
       attestations: write
       id-token: write
 
-    environment: production
+    environment: "production"
     env:
       WP_ORG_DEPLOY_ENABLED: ${{ vars.WP_ORG_DEPLOY_ENABLED }}
       WOOCOMMERCE_COM_DEPLOY_ENABLED: ${{ vars.WOOCOMMERCE_COM_DEPLOY_ENABLED }}
@@ -50,17 +52,25 @@ jobs:
           exit 1
 
       - name: Checkout protected default branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
+          ref: 'main'
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Preserve current trusted release helpers
+        run: |
+          mkdir -p "$RUNNER_TEMP/wp-plugin-base-release-driver"
+          cp -R .wp-plugin-base/scripts "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts"
+          cp -R .wp-plugin-base/docs "$RUNNER_TEMP/wp-plugin-base-release-driver/docs"
+          cp -R .wp-plugin-base/tools "$RUNNER_TEMP/wp-plugin-base-release-driver/tools"
+          cp -R .wp-plugin-base/templates "$RUNNER_TEMP/wp-plugin-base-release-driver/templates"
 
       - name: Verify merged commit is reachable from main
         env:
           EXPECTED_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
           set -euo pipefail
-          git fetch --unshallow origin main || git fetch origin main
           if ! git merge-base --is-ancestor "$EXPECTED_COMMIT" origin/main; then
             echo "Merged commit $EXPECTED_COMMIT is not reachable from origin/main." >&2
             exit 1
@@ -70,94 +80,124 @@ jobs:
       - name: Read config
         id: config
         shell: bash
-        run: bash .wp-plugin-base/scripts/ci/write_config_outputs.sh project ".wp-plugin-base.env" "$GITHUB_OUTPUT"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/write_config_outputs.sh" project ".wp-plugin-base.env" "$GITHUB_OUTPUT"
+
+      - name: Validate release automation context
+        env:
+          ALLOW_HISTORICAL_BRANCH: 'false'
+        run: |
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/check_release_context.sh" ".wp-plugin-base.env" "$RELEASE_WORKFLOW_BRANCH" "$ALLOW_HISTORICAL_BRANCH"
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: ${{ steps.config.outputs.php_version }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ steps.config.outputs.node_version }}
 
       - name: Validate WordPress readiness
         if: ${{ steps.config.outputs.wordpress_readiness_enabled == 'true' }}
         env:
+          WP_PLUGIN_BASE_PACKAGE_RESULT_FILE: ${{ runner.temp }}/wp-plugin-base-package-result
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
           GH_TOKEN: ${{ github.token }}
           WP_PLUGIN_BASE_STRICT_DEPLOY_ENV_PROTECTION: 'true'
           WP_ORG_DEPLOY_ENABLED: ${{ env.WP_ORG_DEPLOY_ENABLED }}
-        run: bash .wp-plugin-base/scripts/ci/validate_wordpress_readiness.sh ".wp-plugin-base.env" "$BRANCH_NAME"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/validate_wordpress_readiness.sh" ".wp-plugin-base.env" "$BRANCH_NAME"
 
       - name: Validate metadata versions
         if: ${{ steps.config.outputs.wordpress_readiness_enabled != 'true' }}
-        run: bash .wp-plugin-base/scripts/ci/check_versions.sh "${{ steps.release.outputs.version }}"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/check_versions.sh" "${{ steps.release.outputs.version }}"
 
       - name: Lint PHP
         if: ${{ steps.config.outputs.wordpress_readiness_enabled != 'true' }}
-        run: bash .wp-plugin-base/scripts/ci/lint_php.sh
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/lint_php.sh"
 
       - name: Lint JavaScript
         if: ${{ steps.config.outputs.wordpress_readiness_enabled != 'true' }}
-        run: bash .wp-plugin-base/scripts/ci/lint_js.sh
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/lint_js.sh"
 
       - name: Build package
         if: ${{ steps.config.outputs.wordpress_readiness_enabled != 'true' }}
-        run: bash .wp-plugin-base/scripts/ci/build_zip.sh
+        env:
+          WP_PLUGIN_BASE_PACKAGE_RESULT_FILE: ${{ runner.temp }}/wp-plugin-base-package-result
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/ci/build_zip.sh"
 
       - name: Generate GitHub release body
-        run: bash .wp-plugin-base/scripts/release/generate_github_release_body.sh "${{ steps.release.outputs.version }}" > dist/release-body.md
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/generate_github_release_body.sh" "${{ steps.release.outputs.version }}" > dist/release-body.md
 
       - name: Install SBOM and signing tools
         run: |
-          bash .wp-plugin-base/scripts/release/install_release_security_tools.sh "$RUNNER_TEMP/wp-plugin-base-release-tools"
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/install_release_security_tools.sh" "$RUNNER_TEMP/wp-plugin-base-release-tools"
           echo "$RUNNER_TEMP/wp-plugin-base-release-tools" >> "$GITHUB_PATH"
+
+      - name: Capture verified package generation
+        id: package
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/lib/package_generation.sh"
+          wp_plugin_base_capture_package "$RUNNER_TEMP/wp-plugin-base-package-result"
+          cat "$RUNNER_TEMP/wp-plugin-base-package-result" >> "$GITHUB_OUTPUT"
+          for key in DIR ZIP SBOM SIGNATURE DESCRIPTOR SHA256; do
+            name="WP_PLUGIN_BASE_PACKAGE_$key"
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
 
       - name: Generate package SBOM
         run: |
-          bash .wp-plugin-base/scripts/release/generate_sbom.sh \
-            "dist/package/${{ steps.config.outputs.plugin_slug }}" \
-            "dist/${{ steps.config.outputs.zip_file }}.sbom.cdx.json"
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/generate_sbom.sh" \
+            "$WP_PLUGIN_BASE_PACKAGE_DIR" \
+            "$WP_PLUGIN_BASE_PACKAGE_SBOM"
 
       - name: Sign release package
         run: |
-          bash .wp-plugin-base/scripts/release/sign_release.sh \
-            "dist/${{ steps.config.outputs.zip_file }}" \
-            "dist/${{ steps.config.outputs.zip_file }}.sigstore.json"
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/sign_release.sh" \
+            "$WP_PLUGIN_BASE_PACKAGE_ZIP" \
+            "$WP_PLUGIN_BASE_PACKAGE_SIGNATURE"
+
+      - name: Verify signing identity before publication
+        run: |
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/verify_sigstore_bundle.sh" \
+            "$GITHUB_REPOSITORY" \
+            "$WP_PLUGIN_BASE_PACKAGE_ZIP" \
+            "$WP_PLUGIN_BASE_PACKAGE_SIGNATURE" \
+            plugin github-release "$GITHUB_API_URL" "" "" "$RELEASE_WORKFLOW_BRANCH"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.config.outputs.plugin_slug }}-${{ steps.release.outputs.version }}
-          path: dist/${{ steps.config.outputs.zip_file }}
+          path: ${{ steps.package.outputs.zip_path }}
           if-no-files-found: error
 
       - name: Attest package provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
-          subject-path: dist/${{ steps.config.outputs.zip_file }}
+          subject-path: ${{ steps.package.outputs.zip_path }}
 
       - name: Validate WordPress.org deploy configuration
         if: ${{ env.WP_ORG_DEPLOY_ENABLED == 'true' }}
-        run: bash .wp-plugin-base/scripts/release/validate_wordpress_org_deploy.sh "${{ steps.release.outputs.version }}" ".wp-plugin-base.env" "dist/package/${{ steps.config.outputs.plugin_slug }}"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/validate_wordpress_org_deploy.sh" "${{ steps.release.outputs.version }}" ".wp-plugin-base.env" "$WP_PLUGIN_BASE_PACKAGE_DIR"
 
       - name: Validate WooCommerce.com deploy configuration
         if: ${{ env.WOOCOMMERCE_COM_DEPLOY_ENABLED == 'true' }}
         env:
           WOO_COM_USERNAME: ${{ secrets.WOO_COM_USERNAME }}
           WOO_COM_APP_PASSWORD: ${{ secrets.WOO_COM_APP_PASSWORD }}
-        run: bash .wp-plugin-base/scripts/release/validate_woocommerce_com_deploy.sh "${{ steps.release.outputs.version }}" ".wp-plugin-base.env" "dist/package/${{ steps.config.outputs.plugin_slug }}"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/validate_woocommerce_com_deploy.sh" "${{ steps.release.outputs.version }}" ".wp-plugin-base.env" "$WP_PLUGIN_BASE_PACKAGE_DIR"
 
       - name: Inspect release tag state
         id: tag
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
           EXPECTED_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
           set -euo pipefail
-          git fetch --tags origin
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/github_git.sh" fetch --tags origin
           if ! git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null 2>&1; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -186,8 +226,10 @@ jobs:
         run: git -c tag.gpgsign=false tag -a "${{ steps.release.outputs.version }}" -m "Release ${{ steps.release.outputs.version }}"
 
       - name: Push tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         if: ${{ steps.tag.outputs.exists != 'true' }}
-        run: git push origin "${{ steps.release.outputs.version }}"
+        run: bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/github_git.sh" push origin "${{ steps.release.outputs.version }}"
 
       - name: Create GitHub release
         env:
@@ -197,15 +239,15 @@ jobs:
           if [ "${{ steps.tag.outputs.exists }}" = "true" ]; then
             repair_args+=(--repair)
           fi
-          bash .wp-plugin-base/scripts/release/publish_github_release.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/publish_github_release.sh" \
             --mark-latest \
             "${repair_args[@]}" \
             "${{ steps.release.outputs.version }}" \
             "${{ steps.release.outputs.version }}" \
             dist/release-body.md \
-            "dist/${{ steps.config.outputs.zip_file }}" \
-            "dist/${{ steps.config.outputs.zip_file }}.sbom.cdx.json" \
-            "dist/${{ steps.config.outputs.zip_file }}.sigstore.json"
+            "$WP_PLUGIN_BASE_PACKAGE_ZIP" \
+            "$WP_PLUGIN_BASE_PACKAGE_SBOM" \
+            "$WP_PLUGIN_BASE_PACKAGE_SIGNATURE"
 
       - name: Verify GitHub release
         env:
@@ -214,12 +256,12 @@ jobs:
           ZIP_FILE: ${{ steps.config.outputs.zip_file }}
         run: |
           set -euo pipefail
-          bash .wp-plugin-base/scripts/release/verify_github_release_assets.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/verify_github_release_assets.sh" \
             "$VERSION" \
             false \
-            "dist/${ZIP_FILE}" \
-            "dist/${ZIP_FILE}.sbom.cdx.json" \
-            "dist/${ZIP_FILE}.sigstore.json"
+            "$WP_PLUGIN_BASE_PACKAGE_ZIP" \
+            "$WP_PLUGIN_BASE_PACKAGE_SBOM" \
+            "$WP_PLUGIN_BASE_PACKAGE_SIGNATURE"
 
       - name: Install Subversion (post-publish)
         if: ${{ env.WP_ORG_DEPLOY_ENABLED == 'true' }}
@@ -234,10 +276,10 @@ jobs:
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
         run: |
-          bash .wp-plugin-base/scripts/release/deploy_wordpress_org.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/deploy_wordpress_org.sh" \
             "${{ steps.release.outputs.version }}" \
             ".wp-plugin-base.env" \
-            "dist/package/${{ steps.config.outputs.plugin_slug }}"
+            "$WP_PLUGIN_BASE_PACKAGE_DIR"
 
       - name: Deploy to WooCommerce.com Marketplace (post-publish)
         id: deploy_woocommerce_post_publish
@@ -247,10 +289,10 @@ jobs:
           WOO_COM_USERNAME: ${{ secrets.WOO_COM_USERNAME }}
           WOO_COM_APP_PASSWORD: ${{ secrets.WOO_COM_APP_PASSWORD }}
         run: |
-          bash .wp-plugin-base/scripts/release/deploy_woocommerce_com.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/deploy_woocommerce_com.sh" \
             "${{ steps.release.outputs.version }}" \
             ".wp-plugin-base.env" \
-            "dist/${{ steps.config.outputs.zip_file }}"
+            "$WP_PLUGIN_BASE_PACKAGE_ZIP"
 
       - name: Summarize channel deployment results
         if: ${{ always() }}
@@ -302,7 +344,7 @@ jobs:
         env:
           GLOTPRESS_TOKEN: ${{ secrets.GLOTPRESS_TOKEN }}
         run: |
-          bash .wp-plugin-base/scripts/release/trigger_glotpress_import.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/trigger_glotpress_import.sh" \
             "${{ steps.release.outputs.version }}" \
             ".wp-plugin-base.env"
 
@@ -311,6 +353,6 @@ jobs:
         env:
           DEPLOY_NOTIFICATION_WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFICATION_WEBHOOK_URL }}
         run: |
-          bash .wp-plugin-base/scripts/release/send_deploy_notification.sh \
+          bash "$RUNNER_TEMP/wp-plugin-base-release-driver/scripts/release/send_deploy_notification.sh" \
             "${{ steps.release.outputs.version }}" \
             ".wp-plugin-base.env"

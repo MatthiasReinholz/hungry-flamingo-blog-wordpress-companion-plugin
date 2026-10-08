@@ -5,6 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/require_tools.sh
 . "$SCRIPT_DIR/../lib/require_tools.sh"
+# shellcheck source=../lib/provider.sh
+. "$SCRIPT_DIR/../lib/provider.sh"
 
 wp_plugin_base_require_commands "workflow audit" git ruby perl
 
@@ -23,57 +25,109 @@ if [ ! -d "$TARGET_ROOT" ]; then
   exit 1
 fi
 
+# An explicit value supports non-default config paths. Otherwise use the same
+# data-only parser as sync; do not trust a workflow to declare its own policy.
+AUDIT_DEFAULT_BRANCH="${2:-}"
+if [ -z "$AUDIT_DEFAULT_BRANCH" ] && [ -f "$TARGET_ROOT/.wp-plugin-base.env" ]; then
+  AUDIT_DEFAULT_BRANCH="$(
+    # shellcheck source=../lib/load_config.sh
+    . "$SCRIPT_DIR/../lib/load_config.sh"
+    wp_plugin_base_load_config "$TARGET_ROOT/.wp-plugin-base.env"
+    printf '%s' "$DEFAULT_BRANCH"
+  )"
+fi
+AUDIT_DEFAULT_BRANCH="${AUDIT_DEFAULT_BRANCH:-main}"
+wp_plugin_base_valid_branch "$AUDIT_DEFAULT_BRANCH" || { echo "Invalid workflow default branch." >&2; exit 1; }
+export WP_PLUGIN_BASE_AUDIT_DEFAULT_BRANCH="$AUDIT_DEFAULT_BRANCH"
+
 declare -a workflow_dirs=()
 declare -a action_dirs=()
 declare -a scan_dirs=()
 declare -a workflow_files=()
 declare -a action_files=()
 
-for dir in \
-  "$TARGET_ROOT/.github/workflows" \
-  "$TARGET_ROOT/templates/child/.github/workflows" \
-  "$TARGET_ROOT/.wp-plugin-base/.github/workflows"
-do
-  if [ -d "$dir" ]; then
-    workflow_dirs+=("$dir")
-  fi
-done
+append_workflow_dir() {
+  local dir="$1"
+  local existing
 
-for dir in \
-  "$TARGET_ROOT/.github/actions" \
-  "$TARGET_ROOT/templates/child/.github/actions" \
-  "$TARGET_ROOT/.wp-plugin-base/.github/actions"
-do
-  if [ -d "$dir" ]; then
-    action_dirs+=("$dir")
-  fi
-done
+  [ -d "$dir" ] || return 0
 
-for dir in \
-  "$TARGET_ROOT/.github/workflows" \
-  "$TARGET_ROOT/templates/child/.github/workflows" \
-  "$TARGET_ROOT/scripts" \
-  "$TARGET_ROOT/.github/actions" \
-  "$TARGET_ROOT/templates/child/.github/actions" \
-  "$TARGET_ROOT/.wp-plugin-base/.github/workflows" \
-  "$TARGET_ROOT/.wp-plugin-base/.github/actions" \
-  "$TARGET_ROOT/.wp-plugin-base/scripts"
-do
-  if [ -d "$dir" ]; then
-    scan_dirs+=("$dir")
+  if [ "${workflow_dirs+x}" = x ]; then
+    for existing in "${workflow_dirs[@]}"; do
+      [ "$existing" != "$dir" ] || return 0
+    done
   fi
-done
 
-if [ "${#workflow_dirs[@]}" -eq 0 ]; then
+  workflow_dirs+=("$dir")
+}
+
+append_action_dir() {
+  local dir="$1"
+  local existing
+
+  [ -d "$dir" ] || return 0
+
+  if [ "${action_dirs+x}" = x ]; then
+    for existing in "${action_dirs[@]}"; do
+      [ "$existing" != "$dir" ] || return 0
+    done
+  fi
+
+  action_dirs+=("$dir")
+}
+
+append_scan_dir() {
+  local dir="$1"
+  local existing
+
+  [ -d "$dir" ] || return 0
+
+  if [ "${scan_dirs+x}" = x ]; then
+    for existing in "${scan_dirs[@]}"; do
+      [ "$existing" != "$dir" ] || return 0
+    done
+  fi
+
+  scan_dirs+=("$dir")
+}
+
+append_workflow_dir "$TARGET_ROOT/.github/workflows"
+if [ -d "$TARGET_ROOT/templates/child" ]; then
+  while IFS= read -r dir; do
+    append_workflow_dir "$dir"
+  done < <(find "$TARGET_ROOT/templates/child" -type d -path '*/.github/workflows' | sort)
+fi
+append_workflow_dir "$TARGET_ROOT/.wp-plugin-base/.github/workflows"
+
+append_action_dir "$TARGET_ROOT/.github/actions"
+if [ -d "$TARGET_ROOT/templates/child" ]; then
+  while IFS= read -r dir; do
+    append_action_dir "$dir"
+  done < <(find "$TARGET_ROOT/templates/child" -type d -path '*/.github/actions' | sort)
+fi
+append_action_dir "$TARGET_ROOT/.wp-plugin-base/.github/actions"
+
+if [ "${workflow_dirs+x}" != x ]; then
   echo "No workflow directories found under $TARGET_ROOT" >&2
   exit 1
 fi
+
+for dir in "${workflow_dirs[@]}"; do
+  append_scan_dir "$dir"
+done
+append_scan_dir "$TARGET_ROOT/scripts"
+if [ "${action_dirs+x}" = x ]; then
+  for dir in "${action_dirs[@]}"; do
+    append_scan_dir "$dir"
+  done
+fi
+append_scan_dir "$TARGET_ROOT/.wp-plugin-base/scripts"
 
 while IFS= read -r file; do
   workflow_files+=("$file")
 done < <(find "${workflow_dirs[@]}" -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
 
-if [ "${#workflow_files[@]}" -eq 0 ]; then
+if [ "${workflow_files+x}" != x ]; then
   echo "No workflow files found under $TARGET_ROOT" >&2
   exit 1
 fi
@@ -84,7 +138,7 @@ while IFS= read -r file; do
   exit 1
 done < <(printf '%s\n' "${workflow_files[@]}" | grep -E '\.yaml$' || true)
 
-if [ "${#action_dirs[@]}" -gt 0 ]; then
+if [ "${action_dirs+x}" = x ]; then
   while IFS= read -r file; do
     action_files+=("$file")
   done < <(find "${action_dirs[@]}" -type f \( -name 'action.yml' -o -name 'action.yaml' \) | sort)
@@ -94,7 +148,7 @@ export WP_PLUGIN_BASE_AUDIT_ROOT="$TARGET_ROOT"
 export WP_PLUGIN_BASE_AUDIT_WORKFLOWS
 WP_PLUGIN_BASE_AUDIT_WORKFLOWS="$(printf '%s\n' "${workflow_files[@]}")"
 export WP_PLUGIN_BASE_AUDIT_ACTIONS
-if [ "${#action_files[@]}" -gt 0 ]; then
+if [ "${action_files+x}" = x ]; then
   WP_PLUGIN_BASE_AUDIT_ACTIONS="$(printf '%s\n' "${action_files[@]}")"
 else
   WP_PLUGIN_BASE_AUDIT_ACTIONS=''
@@ -116,6 +170,7 @@ expected_permissions = {
   "prepare-release.yml" => { "contents" => "read", "pull-requests" => "read" },
   "update-foundation.yml" => { "contents" => "read", "pull-requests" => "read" },
   "update-plugin-check.yml" => { "contents" => "read", "pull-requests" => "read" },
+  "update-external-dependency.yml" => { "contents" => "read", "pull-requests" => "read" },
   "finalize-foundation-release.yml" => { "contents" => "read" },
   "release-foundation.yml" => { "contents" => "read", "pull-requests" => "read" },
   "finalize-release.yml" => { "contents" => "read" },
@@ -137,6 +192,7 @@ expected_job_permissions = {
   },
   "ci.yml" => {
     "wordpress-readiness" => {
+      "actions" => "read",
       "contents" => "read",
       "security-events" => "write"
     }
@@ -166,7 +222,12 @@ expected_job_permissions = {
     }
   },
   "update-plugin-check.yml" => {
-    "update" => {
+    "update" => { "contents" => "write", "pull-requests" => "write" }
+  },
+  "update-external-dependency.yml" => {
+    "prepare" => { "contents" => "read" },
+    "validate" => { "contents" => "read" },
+    "publish" => {
       "contents" => "write",
       "pull-requests" => "write"
     }
@@ -351,6 +412,18 @@ workflow_files.each do |file|
   expected = expected_permissions[basename]
   expected_jobs = expected_job_permissions.fetch(basename, {})
   expected_pull_request_target_jobs = expected_pull_request_target_conditions[basename]
+  if basename == "finalize-release.yml"
+    branch_operand = if file.include?("/templates/child/")
+      "'__DEFAULT_BRANCH__'"
+    elsif trigger_block.is_a?(Hash) && trigger_block.key?("workflow_call")
+      "github.event.repository.default_branch"
+    else
+      "'#{ENV.fetch('WP_PLUGIN_BASE_AUDIT_DEFAULT_BRANCH')}'"
+    end
+    expected_pull_request_target_jobs = expected_pull_request_target_jobs.transform_values do |condition|
+      condition.sub("base.ref == 'main'", "base.ref == #{branch_operand}")
+    end
+  end
   jobs = data["jobs"]
 
   if permissions.nil?
@@ -492,57 +565,7 @@ if [ "${#action_files[@]}" -gt 0 ]; then
   audit_yaml_files+=("${action_files[@]}")
 fi
 
-declare -a allowed_actions=(
-  "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
-  "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"
-  "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
-  "actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32"
-  "github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225"
-  "ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a"
-  "shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f"
-)
-
-declare -a uses_entries=()
-while IFS= read -r entry; do
-  uses_entries+=("$entry")
-done < <(
-  perl -ne '
-    if (/^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*([^[:space:]]+)/) {
-      print "$ARGV:$.:$1\n";
-    }
-  ' "${audit_yaml_files[@]}"
-)
-
-if [ "${#uses_entries[@]}" -gt 0 ]; then
-  for entry in "${uses_entries[@]}"; do
-    file="${entry%%:*}"
-    rest="${entry#*:}"
-    line="${rest%%:*}"
-    ref="${entry##*:}"
-
-    if [[ "$ref" == ./* ]]; then
-      continue
-    fi
-
-    if [[ ! "$ref" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*@[0-9a-f]{40}$ ]]; then
-      echo "${file}:${line}: action reference must be pinned to a full-length commit SHA: ${ref}" >&2
-      exit 1
-    fi
-
-    allowed=false
-    for action in "${allowed_actions[@]}"; do
-      if [ "$ref" = "$action" ]; then
-        allowed=true
-        break
-      fi
-    done
-
-    if [ "$allowed" != true ]; then
-      echo "${file}:${line}: action is not in the approved allowlist: ${ref}" >&2
-      exit 1
-    fi
-  done
-fi
+ruby "$SCRIPT_DIR/../lib/action_pins.rb" "${audit_yaml_files[@]}"
 
 declare -a scan_files=()
 while IFS= read -r file; do
@@ -621,6 +644,7 @@ declare -a default_allowed_hosts=(
   'auth.docker.io'
   'registry-1.docker.io'
   'token.actions.githubusercontent.com'
+  'accounts.google.com'
 )
 
 declare -a extra_allowed_hosts=()
@@ -630,6 +654,10 @@ if [ -n "${EXTRA_ALLOWED_HOSTS:-}" ]; then
     [ -n "$host" ] || continue
     if [[ ! "$host" =~ ^[A-Za-z0-9.-]+$ ]]; then
       echo "Invalid host in EXTRA_ALLOWED_HOSTS: $host" >&2
+      exit 1
+    fi
+    if wp_plugin_base_host_is_local_or_private "$host"; then
+      echo "EXTRA_ALLOWED_HOSTS host must not use localhost, private-network, link-local, or *.internal hosts: $host" >&2
       exit 1
     fi
     extra_allowed_hosts+=("$host")
@@ -673,6 +701,20 @@ while IFS=: read -r file line url; do
         ;;
     esac
   done
+  # The browser contract targets only the disposable local WordPress fixture.
+  # This exception does not apply to release/update scripts or project config.
+  if [ "$host" = 'localhost:' ] && {
+    [ "$file" = "$TARGET_ROOT/scripts/foundation/test_runtime_packs_wordpress.sh" ] ||
+    [ "$file" = "$TARGET_ROOT/.wp-plugin-base/scripts/foundation/test_runtime_packs_wordpress.sh" ]; }; then
+    continue
+  fi
+  # This reserved test domain is used only by mocked GitLab credential tests.
+  # Keep self-managed-host coverage without allowing it in executable workflows.
+  if [ "$host" = 'gitlab.example.test' ] && {
+    [ "$file" = "$TARGET_ROOT/scripts/foundation/test_create_or_update_pr_auth_header_reset.sh" ] ||
+    [ "$file" = "$TARGET_ROOT/.wp-plugin-base/scripts/foundation/test_create_or_update_pr_auth_header_reset.sh" ]; }; then
+    continue
+  fi
   if ! host_is_allowlisted "$host"; then
     echo "${file}:${line}: URL host is not allowlisted: ${url}" >&2
     if [[ "$host" == gitlab.* ]] || [[ "$host" == *gitlab* ]]; then
@@ -680,17 +722,22 @@ while IFS=: read -r file line url; do
     fi
     exit 1
   fi
-done < <(perl -ne 'while (m#(https?://[^\s"'\''()\$\{\}]+)#g) { print "$ARGV:$.:$1\n"; }' "${scan_files[@]}")
+done < <(perl -ne 'while (m#(https?://[^\s"'\''()\$\{\}]+)#g) { print "$ARGV:$.:$1\n"; } close ARGV if eof;' "${scan_files[@]}")
 
 while IFS=: read -r file line url; do
   [ -n "$url" ] || continue
   echo "${file}:${line}: URL authority must be static and allowlisted before expressions are appended: ${url}" >&2
   exit 1
-done < <(perl -ne 'while (m#(https?://(?:\$\{\{|\$\{|\$[A-Za-z_][A-Za-z0-9_]*))#g) { print "$ARGV:$.:$1\n"; }' "${scan_files[@]}")
+done < <(perl -ne 'while (m#(https?://(?:\$\{\{|\$\{|\$[A-Za-z_][A-Za-z0-9_]*))#g) { print "$ARGV:$.:$1\n"; } close ARGV if eof;' "${scan_files[@]}")
 
 while IFS=: read -r file line content; do
   [ -n "$content" ] || continue
   trimmed="$(printf '%s' "$content" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [[ "$file" == */scripts/ci/prepare_gitlab_runtime.sh ]] && {
+    [ "$trimmed" = "apt-get update" ] ||
+    [ "$trimmed" = "DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git jq nodejs npm perl php-cli python3 rsync ruby subversion unzip zip" ]; }; then
+    continue
+  fi
   if [ "$trimmed" != "run: sudo apt-get update && sudo apt-get install -y subversion" ]; then
     echo "${file}:${line}: apt-get usage is not allowlisted: ${trimmed}" >&2
     exit 1

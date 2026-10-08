@@ -11,10 +11,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/../lib/require_tools.sh"
 
 CONFIG_OVERRIDE="${1:-${WP_PLUGIN_BASE_CONFIG:-.wp-plugin-base.env}}"
-BASE_BRANCH="${2:-main}"
+BASE_BRANCH="${2:-}"
 
 wp_plugin_base_require_commands "foundation update automation" git rsync awk paste perl mktemp
 wp_plugin_base_load_config "$CONFIG_OVERRIDE"
+wp_plugin_base_require_managed_automation "Scheduled foundation update"
+BASE_BRANCH="${BASE_BRANCH:-${DEFAULT_BRANCH:-main}}"
 wp_plugin_base_require_vars FOUNDATION_VERSION FOUNDATION_RELEASE_SOURCE_PROVIDER FOUNDATION_RELEASE_SOURCE_REFERENCE FOUNDATION_RELEASE_SOURCE_API_BASE
 
 AUTOMATION_PROVIDER="${AUTOMATION_PROVIDER:-github}"
@@ -24,10 +26,11 @@ latest_output="$(mktemp)"
 verify_output="$(mktemp)"
 verify_log="$(mktemp)"
 body_file="$(mktemp)"
+migration_paths="$(mktemp)"
 foundation_dir="$(mktemp -d)"
 
 cleanup() {
-  rm -f "$latest_output" "$verify_output" "$verify_log" "$body_file"
+  rm -f "$latest_output" "$verify_output" "$verify_log" "$body_file" "$migration_paths"
   rm -rf "$foundation_dir"
 }
 trap cleanup EXIT
@@ -76,8 +79,14 @@ fi
 
 git init "$foundation_dir" >/dev/null
 git -C "$foundation_dir" remote add origin "$(wp_plugin_base_provider_reference_git_url "$FOUNDATION_RELEASE_SOURCE_PROVIDER" "$FOUNDATION_RELEASE_SOURCE_API_BASE" "$FOUNDATION_RELEASE_SOURCE_REFERENCE")"
-git -C "$foundation_dir" fetch --depth 1 origin "$commit_sha" >/dev/null
+wp_plugin_base_provider_git "$FOUNDATION_RELEASE_SOURCE_PROVIDER" "$FOUNDATION_RELEASE_SOURCE_API_BASE" -C "$foundation_dir" fetch --depth 1 origin "$commit_sha" >/dev/null
 git -C "$foundation_dir" checkout --detach FETCH_HEAD >/dev/null
+
+# Record the current trusted template generation before replacing the vendor.
+# The next release must never guess ownership from a familiar workflow filename.
+if [ ! -f "$ROOT_DIR/.wp-plugin-base-automation.json" ]; then
+  bash "$SCRIPT_DIR/capture_automation_ownership.sh" "$CONFIG_OVERRIDE"
+fi
 
 rm -rf "$ROOT_DIR/.wp-plugin-base"
 mkdir -p "$ROOT_DIR/.wp-plugin-base"
@@ -85,7 +94,8 @@ rsync -a --exclude '.git' "$foundation_dir/" "$ROOT_DIR/.wp-plugin-base/"
 
 perl -0pi -e "s/^FOUNDATION_VERSION=.*/FOUNDATION_VERSION=${verified_version}/m" "$(wp_plugin_base_config_path "$ROOT_DIR" "$CONFIG_OVERRIDE")"
 
-bash "$ROOT_DIR/.wp-plugin-base/scripts/update/sync_child_repo.sh" "$CONFIG_OVERRIDE"
+WP_PLUGIN_BASE_ACTION_MIGRATION_MANIFEST="$migration_paths" \
+  bash "$ROOT_DIR/.wp-plugin-base/scripts/update/sync_child_repo.sh" "$CONFIG_OVERRIDE"
 bash "$ROOT_DIR/.wp-plugin-base/scripts/ci/validate_project.sh" "$CONFIG_OVERRIDE"
 
 case "$AUTOMATION_PROVIDER" in
@@ -117,9 +127,10 @@ EOF
 
 managed_paths="$(
   {
-    printf '%s\n' ".wp-plugin-base"
-    printf '%s\n' "$CONFIG_OVERRIDE"
-    bash "$ROOT_DIR/.wp-plugin-base/scripts/ci/list_managed_files.sh" --mode stage "$CONFIG_OVERRIDE"
+    printf '%s\n' ".wp-plugin-base" || exit 1
+    printf '%s\n' "$CONFIG_OVERRIDE" || exit 1
+    bash "$ROOT_DIR/.wp-plugin-base/scripts/ci/list_managed_files.sh" --mode stage "$CONFIG_OVERRIDE" || exit 1
+    ruby "$ROOT_DIR/.wp-plugin-base/scripts/update/list_migrated_action_paths.rb" "$ROOT_DIR" "$migration_paths" || exit 1
   } | awk '!seen[$0]++' | paste -sd, -
 )"
 export GIT_ADD_PATHS="$managed_paths"

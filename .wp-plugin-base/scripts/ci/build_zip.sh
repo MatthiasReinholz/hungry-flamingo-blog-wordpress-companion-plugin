@@ -7,8 +7,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/../lib/load_config.sh"
 # shellcheck source=../lib/require_tools.sh
 . "$SCRIPT_DIR/../lib/require_tools.sh"
+# shellcheck source=../lib/managed_files.sh
+. "$SCRIPT_DIR/../lib/managed_files.sh"
+# shellcheck source=../lib/package_generation.sh
+. "$SCRIPT_DIR/../lib/package_generation.sh"
+# shellcheck source=../lib/build_outputs.sh
+. "$SCRIPT_DIR/../lib/build_outputs.sh"
 
-wp_plugin_base_require_commands "package build" rsync zip
+wp_plugin_base_require_commands "package build" rsync zip python3 ruby
 
 wp_plugin_base_load_config "${1:-}"
 wp_plugin_base_require_vars PLUGIN_SLUG MAIN_PLUGIN_FILE ZIP_FILE
@@ -17,17 +23,6 @@ MAIN_PLUGIN_PATH="$(wp_plugin_base_resolve_path "$MAIN_PLUGIN_FILE")"
 README_PATH="$(wp_plugin_base_resolve_path "$README_FILE")"
 DISTIGNORE_PATH="$(wp_plugin_base_resolve_path "$DISTIGNORE_FILE")"
 ACTIVE_CONFIG_RELATIVE_PATH="${CONFIG_PATH#"$ROOT_DIR"/}"
-DIST_DIR="$ROOT_DIR/dist"
-STAGE_ROOT="$DIST_DIR/package"
-STAGE_DIR="$STAGE_ROOT/$PLUGIN_SLUG"
-ZIP_PATH="$DIST_DIR/$ZIP_FILE"
-EXCLUDES_FILE="$(mktemp)"
-
-cleanup() {
-  rm -f "$EXCLUDES_FILE"
-}
-
-trap cleanup EXIT
 
 if [ ! -f "$MAIN_PLUGIN_PATH" ]; then
   echo "Main plugin file not found: $MAIN_PLUGIN_FILE" >&2
@@ -39,9 +34,43 @@ if [[ ! "$ZIP_FILE" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$ ]]; then
   exit 1
 fi
 
+if [[ ! "$PLUGIN_SLUG" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "PLUGIN_SLUG must be a simple lowercase plugin slug: $PLUGIN_SLUG" >&2
+  exit 1
+fi
+
+assert_package_output_paths() {
+  python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" guard "$ROOT_DIR" "$PLUGIN_SLUG" "$ZIP_FILE"
+}
+
+# Reject unsafe output paths before executing a build or removing old artifacts.
+assert_package_output_paths
+
 wp_plugin_base_assert_path_within_root "$MAIN_PLUGIN_PATH" "Main plugin file"
 wp_plugin_base_assert_path_within_root "$README_PATH" "Readme file"
 wp_plugin_base_assert_path_within_root "$DISTIGNORE_PATH" "Distignore file"
+wp_plugin_base_validate_build_inputs
+if [ -n "${BUILD_SCRIPT:-}" ]; then
+  wp_plugin_base_assert_path_within_root "$(wp_plugin_base_resolve_path "$BUILD_SCRIPT")" "BUILD_SCRIPT"
+fi
+wp_plugin_base_package_lock "$0" "$@"
+
+GENERATION_DIR="$(python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" create "$ROOT_DIR" "$PLUGIN_SLUG" "$ZIP_FILE")"
+STAGE_ROOT="$GENERATION_DIR/package"
+STAGE_DIR="$STAGE_ROOT/$PLUGIN_SLUG"
+ZIP_PATH="$GENERATION_DIR/$ZIP_FILE"
+GENERATION_PUBLISHED=false
+EXCLUDES_FILE="$(mktemp)"
+
+cleanup() {
+  rm -f "$EXCLUDES_FILE"
+  if [ "$GENERATION_PUBLISHED" != true ]; then
+    python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" discard "$ROOT_DIR" "$GENERATION_DIR" || true
+  fi
+}
+
+trap cleanup EXIT
+
 
 # Keep lib/ package-included: optional runtime packs (for example GitHub updater)
 # ship files from lib/wp-plugin-base/ when explicitly enabled.
@@ -58,6 +87,7 @@ cat <<'EOF' > "$EXCLUDES_FILE"
 /dist/
 /node_modules/
 /.wp-plugin-base.env
+/.wp-plugin-base-automation.json
 /.wp-plugin-base-admin-ui/
 EOF
 
@@ -85,6 +115,7 @@ if [ -n "${BUILD_SCRIPT:-}" ]; then
     done < <(wp_plugin_base_csv_to_lines "$BUILD_SCRIPT_ARGS")
   fi
 
+  wp_plugin_base_prepare_build_outputs
   echo "Running build script: $BUILD_SCRIPT"
   (
     cd "$ROOT_DIR"
@@ -92,6 +123,8 @@ if [ -n "${BUILD_SCRIPT:-}" ]; then
   )
   echo "Build script completed."
 fi
+
+wp_plugin_base_validate_build_outputs
 
 if ! wp_plugin_base_is_true "${ADMIN_UI_PACK_ENABLED:-false}" && [ -d "$ROOT_DIR/assets/admin-ui" ] && find "$ROOT_DIR/assets/admin-ui" -type f | grep -q .; then
   echo "ADMIN_UI_PACK_ENABLED=false but assets/admin-ui still contains built files after the configured build step. Remove the stale admin UI assets or re-enable the admin UI pack before packaging." >&2
@@ -125,7 +158,9 @@ filtered_excludes_file="$(mktemp)"
 grep -Fvx "$configured_readme_path" "$EXCLUDES_FILE" > "$filtered_excludes_file" || true
 mv "$filtered_excludes_file" "$EXCLUDES_FILE"
 
-rm -rf "$STAGE_ROOT" "$ZIP_PATH"
+# A project-owned build can change output paths, so recheck immediately before
+# the first destructive operation as well as before running the build.
+assert_package_output_paths
 mkdir -p "$STAGE_DIR"
 
 if [ -n "${PACKAGE_INCLUDE:-}" ]; then
@@ -207,21 +242,51 @@ if [ "${PLUGIN_RUNTIME_UPDATE_PROVIDER:-none}" != "none" ] || wp_plugin_base_is_
   runtime_update_enabled=true
 fi
 
+assert_runtime_pack_php_is_packaged() {
+  local pack_name="$1"
+  local runtime_directory="$2"
+  local seed_directory="${3:-}"
+  local _template_file=""
+  local relative_path=""
+  local manifest=""
+  local php_count=0
+
+  # The managed manifest remains authoritative as classes are added or removed.
+  manifest="$(wp_plugin_base_print_optional_managed_template_pairs "$pack_name" "$SCRIPT_DIR/../../templates/child")" || {
+    echo "Cannot read the enabled runtime pack manifest: $pack_name" >&2
+    exit 1
+  }
+  while IFS=$'\t' read -r _template_file relative_path; do
+    case "$relative_path" in
+      "$runtime_directory"/*.php)
+        php_count=$((php_count + 1))
+        if [ ! -f "$STAGE_DIR/$relative_path" ]; then
+          echo "Enabled runtime pack is missing required PHP in the package: $relative_path" >&2
+          exit 1
+        fi
+        ;;
+    esac
+  done <<< "$manifest"
+  if [ "$php_count" -eq 0 ]; then
+    echo "Enabled runtime pack has no authoritative PHP manifest: $pack_name" >&2
+    exit 1
+  fi
+
+  if [ -n "$seed_directory" ] && [ ! -f "$STAGE_DIR/$seed_directory/bootstrap.php" ]; then
+    echo "Enabled runtime pack is missing its child-owned bootstrap in the package: $seed_directory/bootstrap.php" >&2
+    exit 1
+  fi
+
+}
+
 if wp_plugin_base_is_true "$runtime_update_enabled"; then
-  staged_updater="$STAGE_DIR/lib/wp-plugin-base/wp-plugin-base-runtime-updater.php"
-  staged_puc_entry="$STAGE_DIR/lib/wp-plugin-base/plugin-update-checker/plugin-update-checker.php"
-
-  if [ ! -f "$staged_updater" ]; then
-    echo "Build error: runtime updater support is enabled but $staged_updater is missing from the package." >&2
-    echo "Run .wp-plugin-base/scripts/update/sync_child_repo.sh to install the runtime updater pack." >&2
-    exit 1
-  fi
-
-  if [ ! -f "$staged_puc_entry" ]; then
-    echo "Build error: runtime updater support is enabled but plugin-update-checker is missing from the package." >&2
-    echo "Run .wp-plugin-base/scripts/update/sync_child_repo.sh to restore lib/wp-plugin-base/plugin-update-checker/." >&2
-    exit 1
-  fi
+  assert_runtime_pack_php_is_packaged "github-release-updater-pack" "lib/wp-plugin-base"
+fi
+if wp_plugin_base_is_true "${REST_OPERATIONS_PACK_ENABLED:-false}"; then
+  assert_runtime_pack_php_is_packaged "rest-operations-pack" "lib/wp-plugin-base/rest-operations" "includes/rest-operations"
+fi
+if wp_plugin_base_is_true "${ADMIN_UI_PACK_ENABLED:-false}"; then
+  assert_runtime_pack_php_is_packaged "admin-ui-pack" "lib/wp-plugin-base/admin-ui" "includes/admin-ui"
 fi
 
 staged_symlinks="$(find "$STAGE_DIR" -type l -print)"
@@ -231,20 +296,17 @@ if [ -n "$staged_symlinks" ]; then
   exit 1
 fi
 
-find "$STAGE_DIR" -exec touch -h -t 200001010000.00 {} +
-(cd "$STAGE_ROOT" && find "$PLUGIN_SLUG" -print | LC_ALL=C sort | zip -X -q "$ZIP_PATH" -@)
+wp_plugin_base_validate_build_outputs "$STAGE_DIR"
+python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" normalize "$STAGE_DIR"
+(
+  # Info-ZIP honors implicit environment options even with explicit arguments.
+  unset ZIPOPT ZIP UNZIP UNZIPOPT ZIPINFO ZIPINFOOPT
+  export TZ=UTC
+  cd "$STAGE_ROOT"
+  find "$PLUGIN_SLUG" -print | LC_ALL=C sort | zip -X -q "$ZIP_PATH" -@
+)
+python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" verify "$ZIP_PATH" "$STAGE_DIR"
+python3 "$WP_PLUGIN_BASE_PACKAGE_HELPER" publish "$ROOT_DIR" "$GENERATION_DIR" "$PLUGIN_SLUG" "$ZIP_FILE"
+GENERATION_PUBLISHED=true
 
-if [ ! -f "$ZIP_PATH" ]; then
-  echo "Failed to create package zip." >&2
-  exit 1
-fi
-
-if command -v unzip >/dev/null 2>&1; then
-  zip_listing="$(unzip -Z1 "$ZIP_PATH")"
-  if ! printf '%s\n' "$zip_listing" | grep -q "^$PLUGIN_SLUG/$MAIN_PLUGIN_FILE$"; then
-    echo "Zip archive does not contain the expected plugin root structure." >&2
-    exit 1
-  fi
-fi
-
-echo "Created $ZIP_PATH"
+echo "Created verified package generation: $ZIP_PATH"

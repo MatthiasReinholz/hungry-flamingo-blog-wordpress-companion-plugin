@@ -142,6 +142,7 @@ php_file_has_register_rest_route_call() {
   local file_path="$1"
 
   php -r '
+require $argv[2];
 $code = file_get_contents($argv[1]);
 if ($code === false) {
   fwrite(STDERR, "Unable to read PHP file.\n");
@@ -149,6 +150,7 @@ if ($code === false) {
 }
 
 $tokens = token_get_all($code);
+$function_alias_targets = wp_plugin_base_function_alias_targets($tokens);
 $count = count($tokens);
 for ($i = 0; $i < $count; $i++) {
   $token = $tokens[$i];
@@ -156,7 +158,7 @@ for ($i = 0; $i < $count; $i++) {
     continue;
   }
 
-  if ($token[0] !== T_STRING || strcasecmp($token[1], "register_rest_route") !== 0) {
+  if (!wp_plugin_base_is_function_call_token($tokens, $i, "register_rest_route", $function_alias_targets)) {
     continue;
   }
 
@@ -178,7 +180,7 @@ for ($i = 0; $i < $count; $i++) {
 }
 
 echo "false";
-' "$file_path"
+' "$file_path" "$SCRIPT_DIR/../lib/php_tokens.php"
 }
 
 if ! jq -e \
@@ -235,6 +237,21 @@ if ! jq -e \
     (
       ($operation.ability // null) == null or
       ($operation.ability | type == "object")
+    ) and
+    (
+      ($operation.error_response // null) == null or
+      (
+        ($operation.error_response | type == "object") and
+        ($operation.error_response | keys | all(. as $key | ["mode", "message"] | index($key) != null)) and
+        ($operation.error_response.mode == "envelope") and
+        (
+          ($operation.error_response.message // null) == null or
+          (
+            ($operation.error_response.message | type == "string") and
+            (($operation.error_response.message | gsub("^[[:space:]]+|[[:space:]]+$"; "") | length) > 0)
+          )
+        )
+      )
     )
   )
 ' <<<"$operations_json" >/dev/null; then
