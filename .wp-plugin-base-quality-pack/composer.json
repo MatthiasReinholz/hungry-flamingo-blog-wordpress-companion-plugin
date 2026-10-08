@@ -7,12 +7,15 @@
     "phpstan/phpstan": "^2.1",
     "phpunit/phpunit": "^9.6",
     "szepeviktor/phpstan-wordpress": "^2.0",
-    "wp-coding-standards/wpcs": "^3.2"
+    "wp-coding-standards/wpcs": "^3.4.1"
   },
   "config": {
     "allow-plugins": {
       "dealerdirect/phpcodesniffer-composer-installer": true
     },
-    "sort-packages": true
+    "sort-packages": true,
+    "platform": {
+      "php": "8.0.0"
+    }
   }
 }

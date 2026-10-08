@@ -1,4 +1,4 @@
-<?php
+<?php // phpcs:disable WordPress.Files.FileName.InvalidClassFileName -- Runtime class prefixes vary by consumer; managed filenames remain stable.
 /**
  * Admin UI loader for managed app conventions.
  *
@@ -36,21 +36,34 @@ if ( ! class_exists( 'WP_Plugin_Base_Admin_UI_Loader' ) ) {
 			add_action(
 				'admin_menu',
 				static function () use ( $config ) {
-					$hook_suffix = add_menu_page(
-						$config['page_title'],
-						$config['menu_title'],
-						$config['capability'],
-						$config['menu_slug'],
-						static function () use ( $config ) {
-							if ( ! current_user_can( $config['capability'] ) ) {
-								return;
-							}
+					$render_page = static function () use ( $config ) {
+						if ( ! current_user_can( $config['capability'] ) ) {
+							return;
+						}
 
-							self::render_root( $config );
-						},
-						'dashicons-admin-generic',
-						58
-					);
+						self::render_root( $config );
+					};
+
+					if ( ! empty( $config['parent_slug'] ) ) {
+						$hook_suffix = add_submenu_page(
+							$config['parent_slug'],
+							$config['page_title'],
+							$config['menu_title'],
+							$config['capability'],
+							$config['menu_slug'],
+							$render_page
+						);
+					} else {
+						$hook_suffix = add_menu_page(
+							$config['page_title'],
+							$config['menu_title'],
+							$config['capability'],
+							$config['menu_slug'],
+							$render_page,
+							'dashicons-admin-generic',
+							58
+						);
+					}
 
 					if ( is_string( $hook_suffix ) && '' !== $hook_suffix ) {
 						self::$pages[ $hook_suffix ] = $config;
@@ -80,6 +93,7 @@ if ( ! class_exists( 'WP_Plugin_Base_Admin_UI_Loader' ) ) {
 		 */
 		private static function render_root( array $config ) {
 			echo '<div class="wrap">';
+			echo '<hr class="wp-header-end">';
 			echo '<div id="' . esc_attr( $config['root_id'] ) . '"></div>';
 			echo '</div>';
 		}
@@ -121,13 +135,31 @@ if ( ! class_exists( 'WP_Plugin_Base_Admin_UI_Loader' ) ) {
 				);
 			}
 
+			$style_dependencies = array( 'wp-components' );
+			if ( file_exists( $asset_base . '/index.css' ) ) {
+				$component_style_handle = $config['style_handle'] . '-components';
+				wp_enqueue_style(
+					$component_style_handle,
+					plugins_url( 'assets/admin-ui/index.css', dirname( __DIR__, 3 ) . '/__MAIN_PLUGIN_FILE__' ),
+					$style_dependencies,
+					$asset_data['version']
+				);
+				if ( function_exists( 'wp_style_add_data' ) && file_exists( $asset_base . '/index-rtl.css' ) ) {
+					wp_style_add_data( $component_style_handle, 'rtl', 'replace' );
+				}
+				$style_dependencies[] = $component_style_handle;
+			}
+
 			if ( file_exists( $asset_base . '/style-index.css' ) ) {
 				wp_enqueue_style(
 					$config['style_handle'],
 					$style_url,
-					array( 'wp-components' ),
+					$style_dependencies,
 					$asset_data['version']
 				);
+				if ( function_exists( 'wp_style_add_data' ) && file_exists( $asset_base . '/style-index-rtl.css' ) ) {
+					wp_style_add_data( $config['style_handle'], 'rtl', 'replace' );
+				}
 			}
 
 			wp_add_inline_script(

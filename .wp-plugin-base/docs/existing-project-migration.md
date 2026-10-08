@@ -2,11 +2,13 @@
 
 Use this path when migrating an existing plugin repository onto `wp-plugin-base`.
 
-Each downstream project should choose one automation host profile. The only normal cross-host case is `FOUNDATION_RELEASE_SOURCE_*`, which describes where `wp-plugin-base` itself is officially published.
+Choose `AUTOMATION_PROFILE=managed` (the default) for hosted automation, or `AUTOMATION_PROFILE=local` for managed sync, validation and packaging without foundation-owned hosted workflows or hosting credentials. See [local development](local-development.md) for ownership capture and safe profile transitions. The hosted setup steps below apply only when enabling managed automation.
+
+Managed downstream automation uses one host profile. `FOUNDATION_RELEASE_SOURCE_*` independently describes where `wp-plugin-base` itself is officially published; online source verification may require credentials even when local project validation does not.
 
 ## Recommended Migration Order
 
-1. Add the foundation repo into `.wp-plugin-base/`.
+1. Import a complete pinned foundation release into `.wp-plugin-base/` using [verified manual import](manual-foundation-import.md). Capture legacy automation ownership before replacing an existing vendor tree, as described there.
 2. Create `.wp-plugin-base.env` from `.wp-plugin-base/templates/child/.wp-plugin-base.env.example`.
 3. Compare the existing repo against the foundation defaults:
    - plugin main file location
@@ -24,11 +26,11 @@ Each downstream project should choose one automation host profile. The only norm
 8. Optionally validate release-branch metadata with `bash .wp-plugin-base/scripts/ci/validate_project.sh .wp-plugin-base.env release/x.y.z`.
 9. Review the generated ZIP to confirm that only installable plugin files are included and that nested file paths are preserved.
 10. Merge only after the repo-local packaging and release semantics still match the previous behavior.
-11. Configure automation permissions for the selected host so release preparation and foundation updates can push branches and open PRs or MRs.
-12. If the host supports action or pipeline allowlists, restrict them to the pinned tools documented in [Security model](security-model.md).
-13. If the host supports SHA pinning or protected includes, require those protections for privileged automation.
-14. If you plan to use automated foundation self-updates, confirm that the selected automation host can access releases from `FOUNDATION_RELEASE_SOURCE_REFERENCE`.
-15. If WordPress.org deploy will remain enabled, move `SVN_USERNAME` and `SVN_PASSWORD` into protected CI secrets and protect the selected deployment environment with at least one reviewer. `PRODUCTION_ENVIRONMENT` defaults to `production` when unset.
+11. For managed hosted automation, configure permissions for the selected host so release preparation and foundation updates can push branches and open PRs or MRs.
+12. When enabling hosted automation, restrict action or pipeline allowlists to the pinned tools documented in [Security model](security-model.md), where supported.
+13. When enabling hosted automation, require SHA pinning or protected includes for privileged automation, where supported.
+14. If you plan to use automated foundation self-updates in the managed profile, confirm that the selected automation host can access releases from `FOUNDATION_RELEASE_SOURCE_REFERENCE`.
+15. If managed hosted WordPress.org deploy will remain enabled, move `SVN_USERNAME` and `SVN_PASSWORD` into protected CI secrets and protect the selected deployment environment with at least one reviewer. `PRODUCTION_ENVIRONMENT` defaults to `production` when unset.
 
 ## Common Migration Adjustments
 
@@ -72,7 +74,7 @@ Before enabling WordPress.org deploy, confirm:
 - the plugin main file and `readme.txt` already exist before validation
 - the selected CI host policy matches the allowlist and pinning rules documented in [Security model](security-model.md)
 
-If you later need to repair a published host release manually, use the host-specific repair flow. GitHub uses the manual `release.yml` workflow for stable tags and the prerelease-only `publish-tag-release.yml` workflow for trusted prerelease tags. GitLab uses the tagged `release` job from the managed `.gitlab-ci.yml`. Both paths verify the existing tag and skip WordPress.org redeploy by default so the existing SVN tag is not rewritten accidentally.
+If you later need to repair a published host release manually, use the host-specific repair flow. GitHub uses the manual `release.yml` workflow for stable tags and the prerelease-only `publish-tag-release.yml` workflow for trusted prerelease tags. GitLab uses the tagged `release` job from the managed `.gitlab-ci.yml`. Both paths verify the existing tag and restore signed published assets for channel retries. A matching SVN tag is idempotent; modified tags remain protected, and older releases cannot replace trunk.
 Downstream channels can fail after host-release publication. On GitHub, pair release repair with `woocommerce-status.yml` when WooCommerce.com is enabled. On GitLab, inspect Woo vendor/QIT status directly because there is no separate status workflow.
 
 ## Release-Order Behavior Change
@@ -91,3 +93,13 @@ Use this ownership model:
 - `tests/wp-plugin-base/bootstrap-child.php`: child-owned overlay for project-specific preloads, hooks, and support-class bootstrapping
 
 If sync warns that managed bootstrap customizations were detected, move those custom `require` statements into `tests/wp-plugin-base/bootstrap-child.php` and rerun sync plus project validation.
+
+For host-specific runner requirements and acceptance limits, see [automation host capabilities](automation-hosts.md).
+
+## Seed And Dependency Maintenance
+
+Foundation sync preserves existing application seeds and dependency manifests. The updated templates fix the DataViews filtering, sorting and pagination behavior; existing children must review the new starter diff and port that behavior into their customized components. Preserve stable machine status IDs in operation results and translate labels only in the UI. Run the child UI build, lint, dependency audit and interaction checks before merging.
+
+For existing npm trees, use targeted compatible dependency updates and regenerate the lockfile in the child repository. Review overrides supplied by the current starter; do not copy its lockfile over a customized manifest. `DEPENDABOT_ECOSYSTEMS=auto` creates coverage for the root Composer/npm manifests and enabled or existing admin UI npm source. Explicit lists remain supported. GitLab children need a project-owned dependency update service.
+
+New REST/admin consumers receive a persisted unique class prefix on first sync. Existing unprefixed runtimes retain their names. To migrate one, choose a unique `RUNTIME_CLASS_PREFIX`, update all child-owned class and callback references together, resync managed files, then test alongside other plugins. Never change only the managed classes while leaving child callbacks on the old identity. An explicit empty prefix preserves legacy behavior.

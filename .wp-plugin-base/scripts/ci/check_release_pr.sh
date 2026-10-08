@@ -10,14 +10,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/require_tools.sh
 . "$SCRIPT_DIR/../lib/require_tools.sh"
 
-wp_plugin_base_require_commands "release pull request verification" curl jq
+wp_plugin_base_require_commands "release pull request verification" curl jq git
 
 REPOSITORY="${1:-}"
 VERSION="${2:-}"
 COMMIT_SHA="${3:-}"
 
 if [ -z "$REPOSITORY" ] || [ -z "$VERSION" ] || [ -z "$COMMIT_SHA" ]; then
-  echo "Usage: $0 owner/repo x.y.z commit-sha" >&2
+  echo "Usage: $0 owner/repo x.y.z commit-sha [trusted-provider trusted-api-base]" >&2
   exit 1
 fi
 
@@ -34,32 +34,51 @@ fi
 AUTOMATION_PROVIDER="${AUTOMATION_PROVIDER:-github}"
 AUTOMATION_API_BASE="${AUTOMATION_API_BASE:-$(wp_plugin_base_provider_default_api_base "$AUTOMATION_PROVIDER")}"
 
+# Hosted recovery pins these values from the current runner context. Historical
+# tag configuration selects its branch identity, never a credential destination.
+if [ -n "${4:-}" ] || [ -n "${5:-}" ]; then
+  if [ -z "${4:-}" ] || [ -z "${5:-}" ]; then
+    echo "Trusted provider and API base must be supplied together." >&2
+    exit 1
+  fi
+  AUTOMATION_PROVIDER="$4"
+  AUTOMATION_API_BASE="$5"
+fi
+wp_plugin_base_require_managed_automation "Release provenance verification"
+wp_plugin_base_valid_branch "${DEFAULT_BRANCH:-main}" || { echo "Invalid release provenance branch." >&2; exit 1; }
+
 response=""
+auth_dir="$(mktemp -d)"
+trap 'rm -rf "$auth_dir"' EXIT
+write_auth_header() {
+  (umask 077; printf '%s: %s\n' "$1" "$2" > "$auth_dir/header")
+}
 
 case "$AUTOMATION_PROVIDER" in
   github)
-    if [ -z "${GITHUB_TOKEN:-}" ]; then
-      echo "GITHUB_TOKEN is required." >&2
+    if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+      echo "GH_TOKEN or GITHUB_TOKEN is required." >&2
       exit 1
     fi
 
-    api_url="https://api.github.com/repos/${REPOSITORY}/commits/${COMMIT_SHA}/pulls"
+    write_auth_header Authorization "Bearer ${GH_TOKEN:-$GITHUB_TOKEN}"
+    api_url="${AUTOMATION_API_BASE}/repos/${REPOSITORY}/commits/${COMMIT_SHA}/pulls"
     response="$(
       wp_plugin_base_run_with_retry 3 2 "Fetch release PR metadata for ${COMMIT_SHA}" \
-        curl -fsSL \
+        curl -fsS \
         --connect-timeout 10 \
         --max-time 60 \
         -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "@$auth_dir/header" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "$api_url"
     )"
     match_count="$(
-      printf '%s' "$response" | jq --arg version "$VERSION" --arg sha "$COMMIT_SHA" '
+      printf '%s' "$response" | jq --arg version "$VERSION" --arg sha "$COMMIT_SHA" --arg base "${DEFAULT_BRANCH:-main}" '
         map(
           select(
             .merged_at != null and
-            .base.ref == "main" and
+            .base.ref == $base and
             (.head.ref == ("release/" + $version) or .head.ref == ("hotfix/" + $version)) and
             .merge_commit_sha == $sha
           )
@@ -78,22 +97,24 @@ case "$AUTOMATION_PROVIDER" in
     if [ -z "${GITLAB_TOKEN:-}" ] && [ -n "${CI_JOB_TOKEN:-}" ]; then
       gitlab_auth_header_name="JOB-TOKEN"
     fi
+    write_auth_header "$gitlab_auth_header_name" "$gitlab_token"
+    unset gitlab_token
     gitlab_project_id="$(wp_plugin_base_provider_gitlab_project_id "$REPOSITORY")"
     api_url="${AUTOMATION_API_BASE}/projects/${gitlab_project_id}/repository/commits/${COMMIT_SHA}/merge_requests?state=merged"
     response="$(
       wp_plugin_base_run_with_retry 3 2 "Fetch release MR metadata for ${COMMIT_SHA}" \
-        curl -fsSL \
+        curl -fsS \
         --connect-timeout 10 \
         --max-time 60 \
-        --header "${gitlab_auth_header_name}: ${gitlab_token}" \
+        --header "@$auth_dir/header" \
         "$api_url"
     )"
     match_count="$(
-      printf '%s' "$response" | jq --arg version "$VERSION" --arg sha "$COMMIT_SHA" '
+      printf '%s' "$response" | jq --arg version "$VERSION" --arg sha "$COMMIT_SHA" --arg base "${DEFAULT_BRANCH:-main}" '
         map(
           select(
             .state == "merged" and
-            .target_branch == "main" and
+            .target_branch == $base and
             (.source_branch == ("release/" + $version) or .source_branch == ("hotfix/" + $version)) and
             .merge_commit_sha == $sha
           )

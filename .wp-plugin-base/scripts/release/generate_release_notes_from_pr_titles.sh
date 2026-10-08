@@ -83,18 +83,20 @@ fix_file="$(mktemp)"
 tweak_file="$(mktemp)"
 update_file="$(mktemp)"
 dev_file="$(mktemp)"
+auth_header="$(mktemp)"
 
 cleanup() {
-  rm -f "$commit_shas_file" "$prs_json_file" "$add_file" "$fix_file" "$tweak_file" "$update_file" "$dev_file"
+  rm -f "$commit_shas_file" "$prs_json_file" "$add_file" "$fix_file" "$tweak_file" "$update_file" "$dev_file" "$auth_header"
 }
 trap cleanup EXIT
 
 git -C "$ROOT_DIR" rev-list "$commit_range" > "$commit_shas_file"
+encoded_default_branch="$(jq -nr --arg branch "${DEFAULT_BRANCH:-main}" '$branch | @uri')"
 
 case "$AUTOMATION_PROVIDER" in
   github)
     gh api --paginate \
-      "repos/${repository}/pulls?state=closed&base=main&sort=updated&direction=desc&per_page=100" \
+      "repos/${repository}/pulls?state=closed&base=${encoded_default_branch}&sort=updated&direction=desc&per_page=100" \
       | jq -s 'add' > "$prs_json_file"
     ;;
   gitlab)
@@ -103,20 +105,18 @@ case "$AUTOMATION_PROVIDER" in
       echo "GITLAB_TOKEN or CI_JOB_TOKEN is required for CHANGELOG_SOURCE=change_request_titles." >&2
       exit 1
     fi
-    gitlab_auth_header_name="PRIVATE-TOKEN"
-    if [ -z "${GITLAB_TOKEN:-}" ] && [ -n "${CI_JOB_TOKEN:-}" ]; then
-      gitlab_auth_header_name="JOB-TOKEN"
-    fi
+    wp_plugin_base_provider_write_auth_header gitlab "$auth_header"
+    unset gitlab_token
     gitlab_project_id="$(wp_plugin_base_provider_gitlab_project_id "$repository")"
     page=1
     printf '[]' > "$prs_json_file"
     while :; do
       page_json="$(
-        curl -fsSL \
+        curl -fsS \
           --connect-timeout 10 \
           --max-time 60 \
-          --header "${gitlab_auth_header_name}: ${gitlab_token}" \
-          "${AUTOMATION_API_BASE}/projects/${gitlab_project_id}/merge_requests?state=merged&target_branch=main&scope=all&order_by=updated_at&sort=desc&per_page=100&page=${page}"
+          --header "@$auth_header" \
+          "${AUTOMATION_API_BASE}/projects/${gitlab_project_id}/merge_requests?state=merged&target_branch=${encoded_default_branch}&scope=all&order_by=updated_at&sort=desc&per_page=100&page=${page}"
       )"
       jq -s '.[0] + .[1]' "$prs_json_file" <(printf '%s' "$page_json") > "${prs_json_file}.next"
       mv "${prs_json_file}.next" "$prs_json_file"

@@ -10,20 +10,21 @@ The intended default for the foundation repository and every project that consum
 - local workflow files committed in the project repository
 - vendored foundation source committed under `.wp-plugin-base/`
 - external actions pinned to full commit SHAs
-- a short allowlist of approved actions
+- a short allowlist of approved actions maintained in `scripts/lib/action-pins.json`
 - read-only workflow permissions by default, with narrowly scoped write permissions only where required
 
 ## Approved Actions
 
 The current hardened baseline allows only these external actions:
 
-- `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
-- `actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
+- `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`
+- `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020`
 - `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
-- `actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32`
-- `github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225`
-- `ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a`
-- `shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f`
+- `actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`
+- `actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8`
+- `github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2`
+- `ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc`
+- `shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240`
 
 The foundation intentionally does not depend on `peter-evans/create-pull-request`, `softprops/action-gh-release`, or `10up/action-wordpress-plugin-deploy`. Those duties are handled by repo-local scripts using `gh` or `svn`.
 
@@ -37,7 +38,7 @@ Recommended settings:
 2. Allow GitHub-authored actions
 3. Allow only the specific non-GitHub actions required by the current foundation version
 4. Enable `Require actions to be pinned to a full-length commit SHA`
-5. Under `Workflow permissions`, use `Read and write permissions` only because release and update workflows need repository writes
+5. Under `Workflow permissions`, use `Read repository contents and packages permissions`; managed workflows request their required writes explicitly at the job level
 6. Enable `Allow GitHub Actions to create and approve pull requests` if you want `prepare-release` or `update-foundation` to open PRs
 
 For workflow-changing update automation on GitHub, the managed updater workflows support one narrow exception to the "prefer ephemeral tokens" rule: an optional repository secret named `WP_PLUGIN_BASE_PR_TOKEN`. Use it only when update automation must push `.github/workflows/*` changes and `github.token` is not sufficient. Scope that token as narrowly as possible and reserve it for the managed PR-creation steps.
@@ -85,8 +86,9 @@ The hardened baseline audits literal workflow and repo-local-script references t
 - `auth.docker.io`
 - `registry-1.docker.io`
 - `token.actions.githubusercontent.com`
+- `accounts.google.com` (Cosign publisher certificate issuer)
 
-Projects can extend this allowlist with `EXTRA_ALLOWED_HOSTS` in `.wp-plugin-base.env` when additional trusted hosts are required. Use hostnames only and keep this list minimal.
+Projects can extend this allowlist with `EXTRA_ALLOWED_HOSTS` in `.wp-plugin-base.env` when additional trusted hosts are required. Use hostnames only; localhost, private-network, link-local, single-label, and `*.internal` hosts are rejected.
 For self-managed GitLab or GitHub Enterprise automation, that workflow-audit allowlist is separate from `TRUSTED_GIT_HOSTS`, which controls config-level trust for release APIs and Sigstore issuer hosts.
 
 Dynamic URL construction inside workflow or local-action `run:` bodies is intentionally out of contract. Those contexts must use literal auditable hosts or delegate the network call to a reviewed repo-local script.
@@ -152,12 +154,12 @@ bash .wp-plugin-base/scripts/release/verify_sigstore_bundle.sh \
   <owner>/<repo> \
   <plugin-zip> \
   <plugin-zip>.sigstore.json \
-  plugin
+  plugin github-release https://api.github.com "" "" <historical-default-branch>
 ```
 
-The strict verifier only trusts signatures produced by the expected release workflows on `refs/heads/main`. Foundation update verification also downloads the signed `dist-foundation-release.json` metadata asset and its Sigstore bundle, verifies the bundle, and compares the repository, version, and commit fields against the selected release before any vendored code is refreshed. For self-managed GitLab foundation sources, `FOUNDATION_RELEASE_SOURCE_SIGSTORE_ISSUER` must be configured explicitly because the issuer is instance-specific. If the newest compatible release fails those checks, the updater falls back to the next older compatible published release instead of trusting the broken candidate.
+The plugin verifier trusts only the expected release workflows on the exact branch recorded for that release (`main` when the setting is absent). Supply that historical `DEFAULT_BRANCH` as the ninth verifier argument; do not substitute today's branch for an old tag. Foundation signatures independently remain bound to `refs/heads/main`. Foundation update verification also downloads the signed `dist-foundation-release.json` metadata asset and its Sigstore bundle, verifies the bundle, and compares the repository, version, and commit fields against the selected release before any vendored code is refreshed. For self-managed GitLab foundation sources, `FOUNDATION_RELEASE_SOURCE_SIGSTORE_ISSUER` must be configured explicitly because the issuer is instance-specific. If the newest compatible release fails those checks, the updater falls back to the next older compatible published release instead of trusting the broken candidate.
 
-If you intentionally need a different branch policy, treat it as an explicit policy change and document it in the repository that consumes the verifier.
+Follow the reviewed [downstream branch migration](downstream-branches.md) procedure when changing a plugin's branch. Historical signatures are never accepted through wildcard branch matching. Hosted recovery pins provenance API requests to its current runner context so historical configuration cannot redirect credentials.
 
 The foundation repository's `scorecard` workflow publishes Scorecard SARIF results to the GitHub Security tab on the default branch. That provides an external, machine-generated view of branch protection, token permissions, dependency update posture, and related repository hygiene.
 
@@ -169,6 +171,8 @@ The foundation repository's `scorecard` workflow publishes Scorecard SARIF resul
 - `admin_post_nopriv_*`
 - REST routes with missing `permission_callback`
 - REST routes with always-public permission callbacks such as `__return_true`, `fn() => true`, static closures returning true, or same-file callbacks that only return true
+
+The REST scanners recognize ordinary and fully qualified calls, plus lexical `use function` aliases with namespace scope. They do not infer variable function names or dynamically constructed callbacks; review those forms explicitly.
 
 Intentional exceptions must be declared in `.wp-plugin-base-security-suppressions.json` (or a custom path via `WP_PLUGIN_BASE_SECURITY_SUPPRESSIONS_FILE`) using this structure:
 
@@ -239,3 +243,15 @@ See also:
 
 - [Update model](update-model.md)
 - [Release model](release-model.md)
+
+## Reviewed action migrations
+
+The workflow auditor reads the same action catalog as sync-time migration. Current
+pins are the only audit-approved values; predecessor pins are explicit migration
+inputs, never audit exceptions. Migration parses YAML action references, rejects
+unknown pins, tags, aliases, merged or duplicate keys, and unsafe paths, and changes only the
+reviewed scalar values. Custom scripts and comments are preserved. See the
+[update model](update-model.md#action-pin-ownership-and-migrations) for staging and
+first-upgrade requirements.
+
+The real WordPress browser fixture may contact its disposable localhost server from `scripts/foundation/test_runtime_packs_wordpress.sh`. The workflow host audit scopes that exception to this exact test entrypoint; it does not allow local/private production endpoints or private hosts in project configuration.

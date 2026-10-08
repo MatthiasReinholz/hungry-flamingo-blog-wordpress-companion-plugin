@@ -14,12 +14,13 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 
 ## Requirements
 
-- WordPress 6.4 or newer; tested through WordPress 6.9.
+- WordPress 6.4 or newer; tested through WordPress 7.1.
 - PHP 8.2 or newer.
 
 ## Development
 
-This repository is managed with `wp-plugin-base` v1.7.11.
+This repository is managed with the `wp-plugin-base` version pinned by
+`FOUNDATION_VERSION` in `.wp-plugin-base.env`.
 
 ```sh
 bash .wp-plugin-base/scripts/update/sync_child_repo.sh
@@ -66,3 +67,27 @@ See [docs/rest-contract.md](docs/rest-contract.md) for request parameters, respo
 ## License
 
 GNU General Public License v3. See [LICENSE](LICENSE).
+
+## WordPress compatibility verification
+
+The October maintenance check used an isolated WordPress 7.1.3 site to verify
+plugin bootstrap, registration of all three dynamic blocks, public/private post
+filtering and the documented `next-posts` REST request with its required `after`
+parameter. The `Tested up to` metadata reflects that qualification; the minimum
+WordPress requirement remains unchanged.
+
+## Foundation maintenance
+
+The complete vendored foundation is imported from signed release `v1.10.3`,
+commit `8bf0092d12c11e37c7ed4f6bc7f86515edfc2fa1`, through the trusted verified
+manual importer. Historical generated workflows were compared against their
+committed templates before explicit ownership reconciliation and regeneration.
+The resulting `.wp-plugin-base-automation.json` records managed file hashes;
+custom application source remains outside managed ownership.
+
+Scheduled foundation updates require a repository-scoped automation credential
+in `WP_PLUGIN_BASE_PR_TOKEN` with contents, pull-request and workflow write
+permissions. The normal `GITHUB_TOKEN` cannot publish workflow changes. Configure
+the secret through GitHub administration, then re-enable and run the scheduled
+updater. Manual source adoption does not repair missing credential permissions.
+Never store credentials in source or Git remotes.

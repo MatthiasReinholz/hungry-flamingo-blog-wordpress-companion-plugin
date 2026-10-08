@@ -53,7 +53,7 @@ case "$ASSURANCE_MODE" in
     ;;
 esac
 
-wp_plugin_base_require_commands "foundation validation" git php node ruby perl rsync zip unzip jq
+wp_plugin_base_require_commands "foundation validation" git php node ruby perl rsync zip unzip jq python3
 
 declare -a assurance_tools=(
   shellcheck
@@ -141,13 +141,15 @@ if grep -Fq 'pull/[0-9]+/merge' "$ROOT_DIR/scripts/release/verify_sigstore_bundl
 fi
 
 bash "$ROOT_DIR/scripts/foundation/check_version.sh"
-bash "$ROOT_DIR/scripts/foundation/check_release_branch.sh" "release/$(tr -d '\n' < "$ROOT_DIR/VERSION")"
+bash "$ROOT_DIR/scripts/foundation/test_changelog_policy.sh"
+current_branch="${GITHUB_HEAD_REF:-$(git -C "$ROOT_DIR" branch --show-current)}"
+bash "$ROOT_DIR/scripts/foundation/check_release_branch.sh" "${current_branch:-detached-head}"
 
 # Keep fixture validation hermetic even if the runner exports repository-level config vars.
 unset FOUNDATION_REPOSITORY FOUNDATION_VERSION PLUGIN_NAME PLUGIN_SLUG MAIN_PLUGIN_FILE README_FILE ZIP_FILE
 unset PHP_VERSION NODE_VERSION VERSION_CONSTANT_NAME WORDPRESS_ORG_SLUG CODEOWNERS_REVIEWERS PRODUCTION_ENVIRONMENT
 unset PHP_RUNTIME_MATRIX PHP_RUNTIME_MATRIX_MODE WORDPRESS_READINESS_ENABLED WORDPRESS_QUALITY_PACK_ENABLED
-unset PHPSTAN_MEMORY_LIMIT
+unset PHPSTAN_MEMORY_LIMIT WORDPRESS_TEST_PLUGINS
 unset WORDPRESS_SECURITY_PACK_ENABLED WOOCOMMERCE_QIT_ENABLED WP_ORG_DEPLOY_ENABLED
 unset REST_OPERATIONS_PACK_ENABLED REST_API_NAMESPACE REST_ABILITIES_ENABLED ADMIN_UI_PACK_ENABLED
 unset ADMIN_UI_STARTER ADMIN_UI_EXPERIMENTAL_DATAVIEWS
@@ -293,6 +295,11 @@ bash "$ROOT_DIR/scripts/foundation/test_rest_operations_pack_abilities.sh"
 bash "$ROOT_DIR/scripts/foundation/test_gitlab_support.sh"
 bash "$ROOT_DIR/scripts/foundation/test_create_or_update_pr_auth_header_reset.sh"
 bash "$ROOT_DIR/scripts/foundation/test_pr_changelog_body_extraction.sh"
+bash "$ROOT_DIR/scripts/foundation/test_release_auth_header_cleanup.sh"
+ruby "$ROOT_DIR/scripts/foundation/test_action_pin_migrations.rb"
+bash "$ROOT_DIR/scripts/foundation/test_child_policy_sync.sh"
+bash "$ROOT_DIR/scripts/foundation/test_temporary_wordpress_cleanup.sh"
+bash "$ROOT_DIR/scripts/foundation/test_pre_push_git_isolation.sh"
 bash "$ROOT_DIR/scripts/foundation/test_lint_pack_pruning.sh"
 bash "$ROOT_DIR/scripts/foundation/test_run_quality_pack_local_fallback.sh"
 bash "$ROOT_DIR/scripts/foundation/test_run_php_runtime_smoke_local_fallback.sh"

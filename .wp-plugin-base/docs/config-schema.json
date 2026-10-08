@@ -39,6 +39,22 @@
       "required_in_scopes": ["sync", "foundation", "project", "ci", "readiness", "release", "deploy-structure", "deploy"],
       "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
+    "AUTOMATION_PROFILE": {
+      "default": "managed",
+      "description": "managed generates hosted automation; local retains local conformance without managed publishers or schedules."
+    },
+    "DEFAULT_BRANCH": {
+      "default": "main",
+      "description": "Downstream default branch; independent of foundation-source signing trust."
+    },
+    "BUILD_OUTPUTS": {
+      "default": "",
+      "description": "Comma-separated explicit generated regular files required after BUILD_SCRIPT. Missing ancestors may be package inputs before building."
+    },
+    "BUILD_OUTPUT_MANIFEST": {
+      "default": "",
+      "description": "Generated JSON artifact manifest in a dedicated output directory; schema_version 1 and artifacts containing repo-relative path and sha256."
+    },
     "AUTOMATION_PROVIDER": {
       "description": "Canonical downstream repository host selector. A downstream project uses one automation host profile at a time in this release.",
       "default": "github",
@@ -87,6 +103,7 @@
       "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
     },
     "NODE_VERSION": {
+      "description": "Node.js version used by managed CI, release, and admin UI tooling. Node.js 22 is the supported default for current WordPress tooling.",
       "required_in_scopes": ["project", "ci", "readiness", "release", "deploy-structure", "deploy"],
       "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
     },
@@ -120,6 +137,10 @@
       "default": "false",
       "pattern": "^(true|false)$"
     },
+    "WORDPRESS_TEST_PLUGINS": {
+      "default": "",
+      "pattern": "^$|^[a-z0-9]+(-[a-z0-9]+)*@[0-9]+(\\.[0-9]+)+(,[a-z0-9]+(-[a-z0-9]+)*@[0-9]+(\\.[0-9]+)+)*$"
+    },
     "WORDPRESS_QUALITY_PACK_ENABLED": {
       "default": "false",
       "pattern": "^(true|false)$"
@@ -128,12 +149,17 @@
       "default": "false",
       "pattern": "^(true|false)$"
     },
+    "GITHUB_CODE_SCANNING_UPLOAD_ENABLED": {
+      "default": "true",
+      "pattern": "^(true|false)$"
+    },
     "RELEASE_READINESS_MODE": {
       "description": "Optional fail-closed readiness profile. Use security-sensitive for plugins that must not release with reduced WordPress readiness, quality, security, Plugin Check, or audit coverage.",
       "default": "standard",
       "pattern": "^(standard|security-sensitive)$"
     },
     "WOOCOMMERCE_QIT_ENABLED": {
+      "description": "Optional manual QIT workflow; supported only with AUTOMATION_PROVIDER=github.",
       "default": "false",
       "pattern": "^(true|false)$"
     },
@@ -153,6 +179,16 @@
       "default": "",
       "pattern": "^$|^https://github[.]com/[^/]+/[^/]+/?$"
     },
+    "DEPENDABOT_ECOSYSTEMS": {
+      "description": "Managed child dependency update coverage. auto detects root npm/Composer and enabled or existing admin UI npm; explicit lists select coverage. GitLab does not generate Dependabot.",
+      "default": "auto",
+      "pattern": "^(auto|github-actions|composer|npm|admin-ui-npm)(,(github-actions|composer|npm|admin-ui-npm))*$"
+    },
+    "RUNTIME_CLASS_PREFIX": {
+      "description": "Optional plugin-specific prefix for generated REST/admin runtime classes and seed callback functions. Empty retains legacy identifiers.",
+      "default": "",
+      "pattern": "^$|^[A-Za-z][A-Za-z0-9_]{0,62}_$"
+    },
     "REST_OPERATIONS_PACK_ENABLED": {
       "default": "false",
       "pattern": "^(true|false)$"
@@ -170,6 +206,7 @@
       "pattern": "^(true|false)$"
     },
     "ADMIN_UI_STARTER": {
+      "description": "Seeded admin UI variant. dataviews requires WordPress 7.1 or newer in plugin and readme metadata.",
       "default": "basic",
       "pattern": "^$|^(basic|dataviews)$"
     },

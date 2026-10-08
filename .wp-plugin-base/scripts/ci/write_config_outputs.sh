@@ -34,6 +34,7 @@ case "$OUTPUT_SCOPE" in
   project)
     {
       echo "automation_provider=${AUTOMATION_PROVIDER}"
+      echo "default_branch=${DEFAULT_BRANCH:-main}"
       echo "automation_api_base=${AUTOMATION_API_BASE}"
       echo "trusted_git_hosts=${TRUSTED_GIT_HOSTS}"
       echo "plugin_slug=${PLUGIN_SLUG}"
@@ -47,7 +48,9 @@ case "$OUTPUT_SCOPE" in
       echo "wordpress_readiness_enabled=${WORDPRESS_READINESS_ENABLED}"
       echo "wordpress_quality_pack_enabled=${WORDPRESS_QUALITY_PACK_ENABLED}"
       echo "wordpress_security_pack_enabled=${WORDPRESS_SECURITY_PACK_ENABLED}"
+      echo "github_code_scanning_upload_enabled=${GITHUB_CODE_SCANNING_UPLOAD_ENABLED}"
       echo "woocommerce_com_product_id=${WOOCOMMERCE_COM_PRODUCT_ID}"
+      echo "runtime_class_prefix=${RUNTIME_CLASS_PREFIX}"
       echo "plugin_runtime_update_provider=${PLUGIN_RUNTIME_UPDATE_PROVIDER}"
       echo "plugin_runtime_update_source_url=${PLUGIN_RUNTIME_UPDATE_SOURCE_URL}"
       echo "github_release_updater_enabled=${GITHUB_RELEASE_UPDATER_ENABLED}"
