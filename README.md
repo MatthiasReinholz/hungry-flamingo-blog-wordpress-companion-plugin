@@ -14,7 +14,7 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 
 ## Requirements
 
-- WordPress 6.4 or newer; tested through WordPress 6.9.
+- WordPress 6.4 or newer; tested through WordPress 7.1.
 - PHP 8.2 or newer.
 
 ## Development
@@ -66,6 +66,14 @@ See [docs/rest-contract.md](docs/rest-contract.md) for request parameters, respo
 ## License
 
 GNU General Public License v3. See [LICENSE](LICENSE).
+
+## WordPress compatibility verification
+
+The October maintenance check used an isolated WordPress 7.1.3 site to verify
+plugin bootstrap, registration of all three dynamic blocks, public/private post
+filtering and the documented `next-posts` REST request with its required `after`
+parameter. The `Tested up to` metadata reflects that qualification; the minimum
+WordPress requirement remains unchanged.
 
 ## Foundation maintenance
 
