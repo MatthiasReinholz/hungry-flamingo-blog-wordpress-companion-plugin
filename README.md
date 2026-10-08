@@ -19,7 +19,8 @@ Companion plugin for the Hungry Flamingo Blog WordPress theme. It owns functiona
 
 ## Development
 
-This repository is managed with `wp-plugin-base` v1.7.11.
+This repository is managed with the `wp-plugin-base` version pinned by
+`FOUNDATION_VERSION` in `.wp-plugin-base.env`.
 
 ```sh
 bash .wp-plugin-base/scripts/update/sync_child_repo.sh
@@ -77,8 +78,8 @@ WordPress requirement remains unchanged.
 
 ## Foundation maintenance
 
-The complete vendored foundation is imported from signed release `v1.10.2`,
-commit `6c342a8f634c6a480ee78f6303118cea18b2356d`, through the trusted verified
+The complete vendored foundation is imported from signed release `v1.10.3`,
+commit `8bf0092d12c11e37c7ed4f6bc7f86515edfc2fa1`, through the trusted verified
 manual importer. Historical generated workflows were compared against their
 committed templates before explicit ownership reconciliation and regeneration.
 The resulting `.wp-plugin-base-automation.json` records managed file hashes;
